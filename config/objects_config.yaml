@@ -1,0 +1,38 @@
+objects:
+  - table
+  - pallet_destack
+  - pallet_stack
+
+table:
+  spawn: true
+  static: true
+  frame_id: base_link # moveit frame id
+  geometry:
+    box:
+      height: 0.60
+      width: 0.80
+      length: 1.0
+  pose: [[0.0,-1.40,0.30],[0.0,0.0,0.0]] # xyz, rpy to  moveit's frame_id 
+
+pallet_stack:
+  spawn: true
+  static: true
+  frame_id: base_link # moveit frame id
+  geometry:
+    box:
+      height: 0.14
+      width: 0.80
+      length: 1.20
+  pose: [[-1.60,0.0,0.07],[0.0,0.0,0.0]] # xyz, rpy to  moveit's frame_id 
+
+pallet_destack:
+  spawn: true
+  static: true
+  frame_id: base_link # moveit frame id
+  geometry:
+    box:
+      height: 0.14
+      width: 0.80
+      length: 1.20
+  pose: [[1.60,0.0,0.07],[0.0,0.0,0.0]] # xyz, rpy to  moveit's frame_id 
+

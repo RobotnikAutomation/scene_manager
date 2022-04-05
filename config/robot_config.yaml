@@ -1,0 +1,9 @@
+#Move_group node parameters 
+group_name: arm
+move_group_timeout: 500 
+
+#Robot setup
+end_effector_link: tool0
+robot_base_link: base_link
+
+
