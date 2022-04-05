@@ -5,9 +5,15 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     ROS_INFO_STREAM("Instantiating SceneManager");
 
     // Get parameters from parameter server
-    nh_ = 
+    nh_ = nh;
     pnh_ = ros::NodeHandle("~");
     
+    // Service
+    add_objects_srv = pnh_.advertiseService("add_objects", &SceneManager::addObjectsCB,this);
+    remove_objects_srv = pnh_.advertiseService("remove_objects", &SceneManager::removeObjectsCB,this);
+    attach_objects_srv = pnh_.advertiseService("attach_objects", &SceneManager::attachObjectsCB,this);
+    detach_objects_srv = pnh_.advertiseService("detach_objects", &SceneManager::detachObjectsCB,this);
+
     // Initialize tf listener and buffer ros objects
     tfBuffer_ = std::make_unique<tf2_ros::Buffer>();
     tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
@@ -179,4 +185,24 @@ bool SceneManager::detachObjects(std::vector<std::string> object_names)
   }
 
   return result && applyAttachedCollisionObjects(attached_objects); 
+}
+
+bool SceneManager::addObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
+{
+ return true;
+}
+
+bool SceneManager::removeObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
+{
+ return true;
+}
+
+bool SceneManager::attachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
+{
+ return true;
+}
+
+bool SceneManager::detachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
+{
+ return true;
 }

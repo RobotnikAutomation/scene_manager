@@ -13,6 +13,7 @@
 
 //Custom
 #include <scene_manager/object_builder.h>
+#include <scene_manager_msgs/ModifyObjects.h>
 
 //MOVEIT
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -32,10 +33,14 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     bool detachObjects(std::vector<std::string> object_names);
 
     // ROS Services
-    ros::ServiceServer add_objects_service;
-    ros::ServiceServer remove_objects_service;
-    ros::ServiceServer attach_objects_service;
-    ros::ServiceServer detach_objects_service;
+    ros::ServiceServer add_objects_srv;
+    ros::ServiceServer remove_objects_srv;
+    ros::ServiceServer attach_objects_srv;
+    ros::ServiceServer detach_objects_srv;
+    bool addObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
+    bool removeObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
+    bool attachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
+    bool detachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
     
   protected: 
   

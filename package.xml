@@ -26,5 +26,9 @@
   <depend>rviz</depend>
   <depend>tf2_ros</depend>
   <depend>xacro</depend>
+  <depend>actionlib_msgs</depend>
+  <depend>scene_manager_msgs</depend>
+  
+
 
 </package>

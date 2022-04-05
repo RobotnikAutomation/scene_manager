@@ -3,7 +3,6 @@ project(scene_manager)
 
 add_compile_options(-std=c++14)
 
-
 find_package(catkin REQUIRED COMPONENTS
 	actionlib
 	moveit_core
@@ -12,14 +11,16 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf2_ros
   moveit_msgs
+  scene_manager_msgs
 )
 
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES ${PROJECT_NAME}
- CATKIN_DEPENDS roscpp
+ CATKIN_DEPENDS roscpp scene_manager_msgs
  DEPENDS
 )
+
 
 include_directories(
   include
@@ -31,6 +32,9 @@ add_library(${PROJECT_NAME}
   src/scene_manager.cpp
   src/object_builder.cpp
 )
+
+add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
+
 
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
