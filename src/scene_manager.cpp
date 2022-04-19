@@ -34,7 +34,6 @@ void SceneManager::loadSceneYaml()
 
   // Read and store parameter objects from parameter server
   pnh_.param<std::vector<std::string>>("objects", scene_objects_names_, scene_objects_names_);
-
   // Create class Object_Builder objects
   for (auto const & object_name: scene_objects_names_)
   {
@@ -76,12 +75,14 @@ bool SceneManager::addObjects(std::vector<std::string> object_names)
   for (auto object_name: object_names){
     try{
       // Check if object to add is available in node database and proceed with spawn operation 
-      moveit_msgs::CollisionObject collision_object = parsed_scene_objects_.at(object_name).getObject();
+      std::vector<moveit_msgs::CollisionObject> collision_object = parsed_scene_objects_.at(object_name).getObjects();
       // Check if object frame exists
-      tfBuffer_->lookupTransform(robot_base_link_,collision_object.header.frame_id,ros::Time(0),ros::Duration(1.0));
-      collision_object.operation = moveit_msgs::CollisionObject::ADD;
-      collision_objects.push_back(collision_object);
-      ROS_INFO("Adding object: %s", object_name.c_str());
+      tfBuffer_->lookupTransform(robot_base_link_,collision_object[0].header.frame_id,ros::Time(0),ros::Duration(1.0));
+      for (auto object: collision_object){
+        object.operation = moveit_msgs::CollisionObject::ADD;
+        collision_objects.push_back(object);
+        ROS_INFO("Adding object: %s", object.id.c_str());
+      }  
     }
     catch (const std::out_of_range& e)
     {
@@ -189,20 +190,28 @@ bool SceneManager::detachObjects(std::vector<std::string> object_names)
 
 bool SceneManager::addObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
 {
- return true;
+ res.result = addObjects(req.names);
+ if(!res.result){throw std::runtime_error("Could not load all desired objects to planning scene.");}
+ return res.result;
 }
 
 bool SceneManager::removeObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
 {
- return true;
+ res.result = removeObjects(req.names);
+ if(!res.result){throw std::runtime_error("Could not remove all desired objects to planning scene.");}
+ return res.result;
 }
 
 bool SceneManager::attachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
 {
- return true;
+ res.result = attachObjects(req.names);
+ if(!res.result){throw std::runtime_error("Could not attach all desired objects.");}
+ return res.result;
 }
 
 bool SceneManager::detachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
 {
- return true;
+ res.result = detachObjects(req.names);
+ if(!res.result){throw std::runtime_error("Could not detach all desired objects.");}
+ return res.result;
 }

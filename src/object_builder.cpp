@@ -12,6 +12,16 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
     pnh_.getParam("spawn", spawn_); 
     pnh_.getParam("static", static_);
 
+    matrix_ = pnh_.hasParam("layout");
+
+    if(matrix_)
+    {   
+        pnh_.getParam("layout/x", layout_x_); 
+        pnh_.getParam("layout/y", layout_y_); 
+        pnh_.getParam("layout/z", layout_z_); 
+        ROS_INFO_STREAM("parseando objecto: " << layout_x_ << " " << layout_y_ << " "<< layout_z_ );
+    }
+
     // Fill in moveit collision object parameters
     collision_object_.id = id_;
     collision_object_.header.frame_id = frame_id_;
@@ -59,7 +69,7 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
 
     if ( geometry_.hasMember("mesh")){
 
-
+        mesh_ = true;
         std::string mesh_path_; 
         pnh_.getParam("geometry/mesh", mesh_path_ );
 
@@ -72,7 +82,7 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
         collision_object_.mesh_poses.push_back(pose_msg);
 
     }else if (geometry_.hasMember("box")){
-        
+        primitive_ = true;
 
         XmlRpc::XmlRpcValue box_primitive_;
         pnh_.getParam("geometry/box", box_primitive_ );
@@ -89,6 +99,61 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
         ROS_WARN("Cannot process geometry parameter, check object configuration yaml");
     }
 
+    // Build matrix of objects if required 
+
+    if(matrix_)
+    { 
+      moveit_msgs::CollisionObject collision_object_add_;
+      collision_object_add_ = collision_object_;
+      // Matrix configuration
+      crates_floor_ = layout_x_*layout_y_;
+      int id = 1;
+      geometry_msgs::Pose pose_;
+      
+      //  De momento solo para primitives 
+      double object_length_ = collision_object_.primitives[0].dimensions[0];
+      double object_width_ = collision_object_.primitives[0].dimensions[1];
+      double object_height_ = collision_object_.primitives[0].dimensions[2];
+
+      matrix_base_length_ = object_length_*layout_x_; 
+      matrix_base_width_ = object_width_*layout_y_;  
+      matrix_base_height_ = collision_object_.primitive_poses[0].position.z + object_height_/2; 
+
+/*    if(mesh_){
+        matrix_base_length_ = collision_object_.mesh_poses[0].position.x*layout_x_; 
+        matrix_base_width_ = collision_object_.mesh_poses[0].position.y*layout_y_;  
+        matrix_base_height_ = collision_object_.mesh_poses[0].position.z; 
+      }
+      if(primitive_){
+        matrix_base_length_ = collision_object_.primitive_poses[0].position.x*layout_x_; 
+        matrix_base_width_ = collision_object_.primitive_poses[0].position.y*layout_y_;  
+        matrix_base_height_ = collision_object_.primitive_poses[0].position.z; 
+      } */
+  
+      for(int z = 0; z <= (layout_z_-1)*crates_floor_; z+=crates_floor_){
+        pose_.position.z = matrix_base_height_ + object_height_*z/crates_floor_;
+        for(int x = 0; x<layout_x_; x++)
+        {
+          for(int y = 0; y<layout_y_; y++)
+          {
+          collision_object_add_.id  = collision_object_.id + "_" + std::to_string(id);
+          pose_.position.x =  -matrix_base_length_/2 + object_length_/2 + x*object_length_;
+          pose_.position.x += collision_object_.primitive_poses[0].position.x;
+          pose_.position.y = -matrix_base_width_/2 + object_width_/2 + y*object_width_;
+          pose_.position.y += collision_object_.primitive_poses[0].position.y;
+          pose_.orientation = collision_object_.primitive_poses[0].orientation;
+          if(mesh_){
+            collision_object_add_.mesh_poses[0] = pose_;
+          }
+          if(primitive_){
+            collision_object_add_.primitive_poses[0] = pose_;
+          }
+          collision_objects_.push_back(collision_object_add_);
+          id += 1;
+          }
+        }
+      }   
+    }else{ collision_objects_.push_back(collision_object_);}
 }
 
 Object_Builder::~Object_Builder(){
@@ -96,8 +161,8 @@ Object_Builder::~Object_Builder(){
 };
 
 
-moveit_msgs::CollisionObject Object_Builder::getObject(){
-    return collision_object_;
+std::vector<moveit_msgs::CollisionObject> Object_Builder::getObjects(){
+    return collision_objects_;
 }
 
 bool Object_Builder::getSpawn(){
