@@ -2,6 +2,22 @@ objects:
   - table
   - pallet_destack
   - pallet_stack
+  - crates
+
+crates:
+  spawn: true
+  static: false
+  frame_id: base_link # moveit frame id
+  geometry:
+    box:
+      height: 0.14
+      width: 0.6
+      length: 0.8
+  pose: [[-1.60,0.0,0.21],[0.0,0.0,0.0]] # xyz, rpy to  moveit's frame_id 
+  layout: 
+    x: 2
+    y: 1 # 2
+    z: 3  
 
 table:
   spawn: true

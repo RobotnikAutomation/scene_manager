@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   tf2_ros
+  tf2
   moveit_msgs
   scene_manager_msgs
 )

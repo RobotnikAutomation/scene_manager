@@ -5,14 +5,14 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     ROS_INFO_STREAM("Instantiating SceneManager");
 
     // Get parameters from parameter server
-    nh_ = nh;
+    nh_ = ros::NodeHandle(nh, "scene_manager");
     pnh_ = ros::NodeHandle("~");
     
     // Service
-    add_objects_srv = pnh_.advertiseService("add_objects", &SceneManager::addObjectsCB,this);
-    remove_objects_srv = pnh_.advertiseService("remove_objects", &SceneManager::removeObjectsCB,this);
-    attach_objects_srv = pnh_.advertiseService("attach_objects", &SceneManager::attachObjectsCB,this);
-    detach_objects_srv = pnh_.advertiseService("detach_objects", &SceneManager::detachObjectsCB,this);
+    add_objects_srv = nh_.advertiseService("add_objects", &SceneManager::addObjectsCB,this);
+    remove_objects_srv = nh_.advertiseService("remove_objects", &SceneManager::removeObjectsCB,this);
+    attach_objects_srv = nh_.advertiseService("attach_objects", &SceneManager::attachObjectsCB,this);
+    detach_objects_srv = nh_.advertiseService("detach_objects", &SceneManager::detachObjectsCB,this);
 
     // Initialize tf listener and buffer ros objects
     tfBuffer_ = std::make_unique<tf2_ros::Buffer>();
@@ -37,8 +37,19 @@ void SceneManager::loadSceneYaml()
   // Create class Object_Builder objects
   for (auto const & object_name: scene_objects_names_)
   {
-    parsed_scene_objects_.insert(make_pair(object_name, Object_Builder(ros::NodeHandle(pnh_ , object_name), object_name)));  
+    try 
+    {
+      parsed_scene_objects_.insert(make_pair(object_name, Object_Builder(ros::NodeHandle(pnh_ , object_name), object_name)));  
+    } catch (const std::runtime_error& e)
+    {
+      ROS_ERROR_STREAM("Exception: " << e.what());
+    }
   }
+
+/*   for (auto const & object_name: scene_objects_names_)
+  {
+    collision_object_map_.insert(make_pair(object_name, Object_Builder(ros::NodeHandle(pnh_ , object_name), object_name).getObjects()));  
+  } */
 
   // Sort scene objects into vectors based on their type : spawn and static properties
   for (auto & [id, parsed_object] : parsed_scene_objects_)
@@ -68,9 +79,9 @@ bool SceneManager::addObjects(std::vector<std::string> object_names)
   std::vector <moveit_msgs::CollisionObject> collision_objects;
 
   // If input vector is empty add all available static objects to scene
-  if(object_names.empty()){
+/*   if(object_names.empty()){
     object_names = static_objects_names_;
-  }
+  } */
 
   for (auto object_name: object_names){
     try{
@@ -110,9 +121,9 @@ bool SceneManager::removeObjects(std::vector<std::string> object_names)
   std::vector <moveit_msgs::CollisionObject> collision_objects;
 
   // If input vector is empty remove all objects in scene
-  if(object_names.empty()){
+/*   if(object_names.empty()){
     object_names = getKnownObjectNames();
-  }
+  } */
 
   // Store collision objects currently in scene
   std::map< std::string,moveit_msgs::CollisionObject > current_objects_ =  getObjects();
@@ -190,14 +201,24 @@ bool SceneManager::detachObjects(std::vector<std::string> object_names)
 
 bool SceneManager::addObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
 {
- res.result = addObjects(req.names);
+ if(req.names.empty() && (req.all == true)){
+  res.result = addObjects(static_objects_names_); 
+ }else{ 
+  res.result = addObjects(req.names);
+ } 
+
  if(!res.result){throw std::runtime_error("Could not load all desired objects to planning scene.");}
  return res.result;
 }
 
 bool SceneManager::removeObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
 {
- res.result = removeObjects(req.names);
+ if(req.names.empty() && (req.all == true)){
+  res.result = removeObjects(getKnownObjectNames()); 
+ }else{ 
+  res.result = removeObjects(req.names);
+ } 
+
  if(!res.result){throw std::runtime_error("Could not remove all desired objects to planning scene.");}
  return res.result;
 }

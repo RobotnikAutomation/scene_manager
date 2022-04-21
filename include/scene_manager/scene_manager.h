@@ -45,7 +45,7 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
   protected: 
   
     std::map<std::string, Object_Builder> parsed_scene_objects_; // map containing object id and object's custom object_builder class object
-  
+    std::map<std::string, std::vector<moveit_msgs::CollisionObject>> collision_object_map_;
   private:
 
     ros::NodeHandle nh_; // node handle

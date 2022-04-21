@@ -25,6 +25,7 @@
   <depend>moveit_msgs</depend>
   <depend>rviz</depend>
   <depend>tf2_ros</depend>
+  <depend>tf2</depend>
   <depend>xacro</depend>
   <depend>actionlib_msgs</depend>
   <depend>scene_manager_msgs</depend>
