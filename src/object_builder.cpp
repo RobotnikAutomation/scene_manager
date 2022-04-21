@@ -205,6 +205,13 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
       }   
     }else{ 
         // If no mesh push parent collision object into vector
+        parent_collision_object_.subframe_names.resize(1);
+        parent_collision_object_.subframe_poses.resize(1);
+        parent_collision_object_.subframe_names[0] = "center";
+        parent_collision_object_.subframe_poses[0].position.z = 1;
+        tf2::Quaternion orientation;
+        orientation.setRPY(0, 0, 0);  // A quarter turn about the x-axis
+        parent_collision_object_.subframe_poses[0].orientation = tf2::toMsg(orientation);
         collision_objects_.push_back(parent_collision_object_);
     }
 }
