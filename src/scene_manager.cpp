@@ -7,20 +7,56 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     // Get parameters from parameter server
     nh_ = ros::NodeHandle(nh, "scene_manager");
     pnh_ = ros::NodeHandle("~");
+
+    // Read and store robot parameters from parameter server
+    pnh_.param<std::string>("robot_base_link", robot_base_link_, robot_base_link_);
+    pnh_.param<std::string>("end_effector_link", robot_eef_link_, robot_eef_link_);
+    pnh_.param<std::string>("group_name", group_name_, group_name_);
+    pnh_.param<double>("move_group_timeout", move_group_timeout_, move_group_timeout_);
     
     // Service
     add_objects_srv = nh_.advertiseService("add_objects", &SceneManager::addObjectsCB,this);
     remove_objects_srv = nh_.advertiseService("remove_objects", &SceneManager::removeObjectsCB,this);
     attach_objects_srv = nh_.advertiseService("attach_objects", &SceneManager::attachObjectsCB,this);
     detach_objects_srv = nh_.advertiseService("detach_objects", &SceneManager::detachObjectsCB,this);
+    move_to_srv = nh_.advertiseService("move_to", &SceneManager::moveToCB,this);
+    
+    // Visualization timer
+    frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));
+    
+    // Visualization publisher
+    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools("world","/moveit_visual_markers"));
+
+    visual_tools_->deleteAllMarkers();
 
     // Initialize tf listener and buffer ros objects
     tfBuffer_ = std::make_unique<tf2_ros::Buffer>();
     tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
+
+    //Reset planning scene monitor
+    planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor("robot_description"));      
     
-    // Read and store robot parameters from parameter server
-    pnh_.param<std::string>("robot_base_link", robot_base_link_, robot_base_link_);
-    pnh_.param<std::string>("end_effector_link", robot_eef_link_, robot_eef_link_);
+    // update the planning scene monitor with the current state
+    bool success = planning_scene_monitor_->requestPlanningSceneState("/get_planning_scene");
+    ROS_INFO_STREAM("Request planning scene " << (success ? "succeeded." : "failed."));
+
+    // keep up to date with new changes
+    planning_scene_monitor_->startSceneMonitor("/move_group/monitored_planning_scene");
+    
+    // Moveit Initialization 
+    move_group_tf2_buffer_.reset(new tf2_ros::Buffer);
+
+    try
+    {
+      move_group_.reset(
+          new moveit::planning_interface::MoveGroupInterface("arm", move_group_tf2_buffer_, ros::WallDuration(move_group_timeout_)));
+    }
+    catch (const std::runtime_error& e)
+    {
+      ROS_ERROR("Cannot create move group with group name: arm. Is MoveIt running? Group name is correct?");
+      ROS_INFO_STREAM("Exception: " << e.what());
+    }
+
     // Read and store scene description
     loadSceneYaml();
 }
@@ -46,10 +82,16 @@ void SceneManager::loadSceneYaml()
     }
   }
 
-/*   for (auto const & object_name: scene_objects_names_)
-  {
-    collision_object_map_.insert(make_pair(object_name, Object_Builder(ros::NodeHandle(pnh_ , object_name), object_name).getObjects()));  
-  } */
+  for (auto const & object_name: scene_objects_names_)
+  {     
+    try 
+    {
+      collision_object_map_.insert(make_pair(object_name, Object_Builder(ros::NodeHandle(pnh_ , object_name), object_name).getObjects())); 
+    } catch (const std::runtime_error& e)
+    {
+      ROS_ERROR_STREAM("Exception: " << e.what());
+    } 
+  }
 
   // Sort scene objects into vectors based on their type : spawn and static properties
   for (auto & [id, parsed_object] : parsed_scene_objects_)
@@ -93,7 +135,7 @@ bool SceneManager::addObjects(std::vector<std::string> object_names)
         object.operation = moveit_msgs::CollisionObject::ADD;
         collision_objects.push_back(object);
         ROS_INFO("Adding object: %s", object.id.c_str());
-      }  
+      }
     }
     catch (const std::out_of_range& e)
     {
@@ -125,6 +167,8 @@ bool SceneManager::removeObjects(std::vector<std::string> object_names)
     object_names = getKnownObjectNames();
   } */
 
+
+
   // Store collision objects currently in scene
   std::map< std::string,moveit_msgs::CollisionObject > current_objects_ =  getObjects();
 
@@ -136,8 +180,17 @@ bool SceneManager::removeObjects(std::vector<std::string> object_names)
       collision_objects.push_back(collision_object);
       ROS_INFO("Removing object: %s", object_name.c_str());
     }catch (const std::out_of_range& e){
-      result = false;
-      ROS_ERROR("The object: %s is not spawned in scene, cannot be removed.", object_name.c_str());
+      try{
+        std::vector<moveit_msgs::CollisionObject> sub_collision_objects = parsed_scene_objects_.at(object_name).getObjects();
+        for (auto collision_object: sub_collision_objects){
+          collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
+          collision_objects.push_back(collision_object);
+          ROS_INFO("Removing object: %s", collision_object.id.c_str());
+        }  
+      }catch (const std::out_of_range& e){
+        result = false;
+        ROS_WARN("The object: %s is not spawned in scene, cannot be removed.", object_name.c_str());
+      }    
     }  
   }
 
@@ -196,7 +249,7 @@ bool SceneManager::detachObjects(std::vector<std::string> object_names)
     }
   }
 
-  return result && applyAttachedCollisionObjects(attached_objects); 
+  return applyAttachedCollisionObjects(attached_objects); 
 }
 
 bool SceneManager::addObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res)
@@ -219,7 +272,7 @@ bool SceneManager::removeObjectsCB(scene_manager_msgs::ModifyObjects::Request &r
   res.result = removeObjects(req.names);
  } 
 
- if(!res.result){throw std::runtime_error("Could not remove all desired objects to planning scene.");}
+ if(!res.result){throw std::runtime_error("Could not remove all desired objects from planning scene.");}
  return res.result;
 }
 
@@ -236,3 +289,43 @@ bool SceneManager::detachObjectsCB(scene_manager_msgs::ModifyObjects::Request &r
  if(!res.result){throw std::runtime_error("Could not detach all desired objects.");}
  return res.result;
 }
+
+bool SceneManager::moveToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res)
+{
+/*  res.result = detachObjects(req.names);
+ if(!res.result){throw std::runtime_error("Could not detach all desired objects.");} */
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
+
+  geometry_msgs::PoseStamped pose;
+  Eigen::Isometry3d tf;
+  tf2::fromMsg(req.pose, tf);
+  pose.pose = tf2::toMsg(planning_scene->getFrameTransform((req.object + "/top")) * tf);
+  pose.header.frame_id = planning_scene->getPlanningFrame();
+
+
+  move_group_->clearPoseTargets();
+  move_group_->setJointValueTarget(pose);
+  moveit::planning_interface::MoveGroupInterface::Plan myplan;
+  if (move_group_->plan(myplan) && move_group_->execute(myplan)){
+    std::cout << "OK" << std::endl;
+  }
+
+  return true;
+}
+
+void SceneManager::frameTimerCB()
+{ 
+  visual_tools_->deleteAllMarkers();
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
+
+  std::map< std::string,moveit_msgs::CollisionObject > current_objects =  getObjects();
+  for (auto & [id, current_object] : current_objects)
+  {
+    visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform((current_object.id + "/top")), id, rviz_visual_tools::LARGE  );
+  }
+  visual_tools_->trigger();
+
+}
+
