@@ -24,13 +24,27 @@ class Object_Builder
     
     Object_Builder(ros::NodeHandle pnh, std::string id);
     virtual ~Object_Builder();
-    std::vector<moveit_msgs::CollisionObject> getObjects();
-    bool getSpawn();
-    bool getStatic();
+    
+    // Query object type
+    bool getSpawn();  // Spawn objects are spawned during init
+    bool getStatic(); // Static objects are spawned during init and are always in scene
+    
+    // Query object identity
     std::string getID();
 
-  protected:
+    // Set object configuration parameters
+    void setPose(geometry_msgs::Pose pose);
+    void setLayout(int layout_x, int layout_y, int layout_z);
 
+    // Generate a matrix of collision objects
+    void buildLayout(int layout_x, int layout_y, int layout_z);
+
+    // Collision objects
+    std::vector<moveit_msgs::CollisionObject> getObjects(); // Retrieve generated output collision objects
+    void clearObjects(); // Remove generated collision objects from output variable
+    void buildObjects(); // Load collision objects to ouput variable
+  
+  protected:
     
   private:
 
@@ -42,7 +56,7 @@ class Object_Builder
     std::string frame_id_; // Frame used for object relative positioning
     XmlRpc::XmlRpcValue geometry_; // Stores object geometry parameter
     XmlRpc::XmlRpcValue pose_; // Stores object pose parameter
-    int layout_x_, layout_y_, layout_z_;
+    int layout_x_ = 0, layout_y_ = 0, layout_z_ = 0;
   
     
     // Global Variables created in Object class after processing parameter info 

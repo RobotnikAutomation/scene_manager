@@ -14,6 +14,11 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
 
     matrix_ = pnh_.hasParam("layout");
 
+
+    // Fill in parent moveit collision object basic parameters
+    parent_collision_object_.id = id_;
+    parent_collision_object_.header.frame_id = frame_id_;
+
     if(matrix_)
     {   if(!pnh_.getParam("layout/x", layout_x_) || layout_x_ <=0)
         {
@@ -87,12 +92,6 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
     }else{
         throw std::runtime_error("Cannot process pose parameter for object: " + id_ + ", it should contain [[x,y,z],[r,p,y]] int or double list, check object configuration yaml");
     }    
-    
-
-    // Fill in parent moveit collision object basic parameters
-    parent_collision_object_.id = id_;
-    parent_collision_object_.header.frame_id = frame_id_;
-    parent_collision_object_.pose = pose_msg;      
 
     // Construct identity pose message
     geometry_msgs::Pose default_pose_msg = geometry_msgs::Pose();
@@ -134,7 +133,6 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
         }
         if(pnh_.getParam("geometry/box/height", height_ )){
             primitive.dimensions[2] = height_;
-            parent_collision_object_.pose.position.z += height_/2;
         }else{
             throw std::runtime_error("Cannot process geometry/box parameter for object: " + id_ + ", it should contain height parameter, check object configuration yaml");
         }
@@ -156,70 +154,113 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
         ROS_WARN("Cannot process geometry parameter, check object configuration yaml");
     }
 
-
-    // Build matrix of objects if required 
+    // Set Pose 
+    Object_Builder::clearObjects();
+    Object_Builder::setPose(pose_msg);
     if(matrix_)
-    { 
-      // Declare needed variables
-      int child_id_ = 1;
-      geometry_msgs::Pose local_child_pose_,global_child_pose_;
-      double matrix_base_length_, matrix_base_width_, matrix_base_height_;
-      int crates_floor_;
-
-      // Create temporary collision object and initialize with parent info
-      moveit_msgs::CollisionObject child_collision_object_;
-      child_collision_object_ = parent_collision_object_;
-      
-      // Matrix configuration
-      crates_floor_ = layout_x_*layout_y_;
-
-      //  De momento solo para primitives 
-      double object_length_ = parent_collision_object_.primitives[0].dimensions[0];
-      double object_width_ = parent_collision_object_.primitives[0].dimensions[1];
-      double object_height_ = parent_collision_object_.primitives[0].dimensions[2];
-
-      matrix_base_length_ = object_length_*layout_x_; 
-      matrix_base_width_ = object_width_*layout_y_;  
-      //matrix_base_height_ = parent_collision_object_.pose.position.z; 
-  
-      for(int z = 0; z <= (layout_z_-1)*crates_floor_; z+=crates_floor_){
-        local_child_pose_.position.z = object_height_*z/crates_floor_;
-        for(int x = 0; x<layout_x_; x++)
-        {
-          for(int y = 0; y<layout_y_; y++)
-          {
-          // Child collision object pose with respect to parent collision object    
-          child_collision_object_.id  = parent_collision_object_.id + "_" + std::to_string(child_id_);
-          local_child_pose_.position.x =  -matrix_base_length_/2 + object_length_/2 + x*object_length_;
-          local_child_pose_.position.y = -matrix_base_width_/2 + object_width_/2 + y*object_width_;
-          local_child_pose_.orientation.w = 1;
-          
-          // Construct transformation matrices 
-          tf2::Transform toParentPose, toGlobalPose;
-          tf2::fromMsg(local_child_pose_, toParentPose);
-          tf2::fromMsg(parent_collision_object_.pose, toGlobalPose);  
-          
-          // Compute global_child_pose_ by multipying by transformation matrices (from local pose -> parent pose -> global pose = toGlobalPose*toParentPose)   
-          tf2::toMsg(toGlobalPose*toParentPose, global_child_pose_);
-
-          // Fill child collision object with computed global child pose
-          child_collision_object_.pose = global_child_pose_;  
-
-          // Push back collision object into vector
-          collision_objects_.push_back(child_collision_object_);
-
-          child_id_ += 1;
-          }
-        }
-      }   
-    }else{ 
-        collision_objects_.push_back(parent_collision_object_);
+    {
+        Object_Builder::setLayout(layout_x_, layout_y_, layout_z_);
     }
+    Object_Builder::buildObjects();
+
 }
 
 Object_Builder::~Object_Builder(){
     
 };
+
+void Object_Builder::setLayout(int layout_x, int layout_y, int layout_z)
+{   
+    if (layout_x <=0 || layout_y <=0 || layout_z <=0){
+        ROS_ERROR_STREAM("Cannot process layout parameter for object: " + id_ + ", it should contain positive integers");
+    }else{
+        this->layout_x_ = layout_x;
+        this->layout_y_ = layout_y;
+        this->layout_z_ = layout_z;
+    }
+}
+
+
+
+void Object_Builder::setPose(geometry_msgs::Pose pose)
+{   
+    //Object_Builder::clearObjects();
+    parent_collision_object_.pose = pose;
+    parent_collision_object_.pose.position.z += parent_collision_object_.primitives[0].dimensions[2]/2; 
+    //collision_objects_.push_back(parent_collision_object_);
+    //Object_Builder::buildObjects();
+}
+
+void Object_Builder::clearObjects(){
+    collision_objects_.clear();
+}
+
+void Object_Builder::buildObjects()
+{
+    Object_Builder::clearObjects();
+
+    if(layout_x_!=0 || layout_y_!=0 || layout_z_!=0 ){
+
+        // Declare needed variables
+        int child_id_ = 1;
+        geometry_msgs::Pose local_child_pose_,global_child_pose_;
+        double matrix_base_length_, matrix_base_width_, matrix_base_height_;
+        int crates_floor_;
+
+        // Create temporary collision object and initialize with parent info
+        moveit_msgs::CollisionObject child_collision_object_;
+        child_collision_object_ = parent_collision_object_;
+        
+        // Matrix configuration
+        crates_floor_ = layout_x_*layout_y_;
+
+        //  De momento solo para primitives 
+        double object_length_ = parent_collision_object_.primitives[0].dimensions[0];
+        double object_width_ = parent_collision_object_.primitives[0].dimensions[1];
+        double object_height_ = parent_collision_object_.primitives[0].dimensions[2];
+
+        matrix_base_length_ = object_length_*layout_x_; 
+        matrix_base_width_ = object_width_*layout_y_;  
+        //matrix_base_height_ = parent_collision_object_.pose.position.z; 
+
+        for(int z = 0; z <= (layout_z_-1)*crates_floor_; z+=crates_floor_)
+        {
+            local_child_pose_.position.z = object_height_*z/crates_floor_;
+            for(int x = 0; x<layout_x_; x++)
+            {
+                for(int y = 0; y<layout_y_; y++)
+                {
+                // Child collision object pose with respect to parent collision object    
+                child_collision_object_.id  = parent_collision_object_.id + "_" + std::to_string(child_id_);
+                local_child_pose_.position.x =  -matrix_base_length_/2 + object_length_/2 + x*object_length_;
+                local_child_pose_.position.y = -matrix_base_width_/2 + object_width_/2 + y*object_width_;
+                local_child_pose_.orientation.w = 1;
+                
+                // Construct transformation matrices 
+                tf2::Transform toParentPose, toGlobalPose;
+                tf2::fromMsg(local_child_pose_, toParentPose);
+                tf2::fromMsg(parent_collision_object_.pose, toGlobalPose);  
+                
+                // Compute global_child_pose_ by multipying by transformation matrices (from local pose -> parent pose -> global pose = toGlobalPose*toParentPose)   
+                tf2::toMsg(toGlobalPose*toParentPose, global_child_pose_);
+
+                // Fill child collision object with computed global child pose
+                child_collision_object_.pose = global_child_pose_;  
+
+                // Push back collision object into vector
+                collision_objects_.push_back(child_collision_object_);
+
+                child_id_ += 1;
+                }
+            }
+        }
+    }    
+
+    if(collision_objects_.empty())
+    {   ROS_INFO_STREAM("collision objects empty");
+        collision_objects_.push_back(parent_collision_object_);
+    }
+}
 
 
 std::vector<moveit_msgs::CollisionObject> Object_Builder::getObjects(){

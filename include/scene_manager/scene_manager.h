@@ -13,8 +13,11 @@
 
 //Custom
 #include <scene_manager/object_builder.h>
-#include <scene_manager_msgs/ModifyObjects.h>
+#include <scene_manager_msgs/SelectObjects.h>
+#include <scene_manager_msgs/ModifyObject.h>
 #include <scene_manager_msgs/MoveTo.h>
+#include <scene_manager_msgs/Layout.h>
+
 
 //MOVEIT
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -49,11 +52,13 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     ros::ServiceServer attach_objects_srv;
     ros::ServiceServer detach_objects_srv;
     ros::ServiceServer move_to_srv;
-    bool addObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
-    bool removeObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
-    bool attachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
-    bool detachObjectsCB(scene_manager_msgs::ModifyObjects::Request &req, scene_manager_msgs::ModifyObjects::Response &res);
+    ros::ServiceServer modify_object_srv;
+    bool addObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
+    bool removeObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
+    bool attachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
+    bool detachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool moveToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res);
+    bool modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req, scene_manager_msgs::ModifyObject::Response &res);
     
     // Frame Timer Callback
     void frameTimerCB();
