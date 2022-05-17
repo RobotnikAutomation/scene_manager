@@ -19,7 +19,7 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     remove_objects_srv = nh_.advertiseService("remove_objects", &SceneManager::removeObjectsCB,this);
     attach_objects_srv = nh_.advertiseService("attach_objects", &SceneManager::attachObjectsCB,this);
     detach_objects_srv = nh_.advertiseService("detach_objects", &SceneManager::detachObjectsCB,this);
-    move_to_srv = nh_.advertiseService("move_to", &SceneManager::moveToCB,this);
+    move_relative_to_srv = nh_.advertiseService("move_relative_to", &SceneManager::moveRelativeToCB,this);
     modify_object_srv = nh_.advertiseService("modify_object", &SceneManager::modifyObjectCB,this);
 
     // Visualization timer
@@ -253,6 +253,36 @@ bool SceneManager::detachObjects(std::vector<std::string> object_names)
   return applyAttachedCollisionObjects(attached_objects); 
 }
 
+bool SceneManager::moveRelativeTo(std::string object_id, geometry_msgs::Pose rel_pose)
+{
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
+  
+  move_group_->setEndEffectorLink("link_6");
+
+  geometry_msgs::PoseStamped pose;
+  Eigen::Isometry3d tf;
+  tf2::fromMsg(rel_pose, tf);
+  /* pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id + "/top")) * tf); */
+  pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id)) * tf);
+  pose.header.frame_id = planning_scene->getPlanningFrame();
+  pose.header.stamp = ros::Time::now();
+
+  move_group_->clearPoseTargets();
+  
+  ROS_INFO_STREAM("set goal pose : " << move_group_->setJointValueTarget(pose));
+  ROS_INFO_STREAM("goal pose: " << pose);
+  moveit::planning_interface::MoveGroupInterface::Plan myplan;
+  ROS_INFO_STREAM("move relative to action executing");
+  if (move_group_->plan(myplan) && move_group_->execute(myplan)){
+    ROS_INFO_STREAM("move relative to action: " << true);
+    return true;
+  }else{
+    ROS_INFO_STREAM("move relative to action: " << false);
+    return false;
+  }
+}
+
 bool SceneManager::addObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res)
 {
  if(req.names.empty() && (req.all == true)){
@@ -293,35 +323,6 @@ bool SceneManager::detachObjectsCB(scene_manager_msgs::SelectObjects::Request &r
 
 bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req, scene_manager_msgs::ModifyObject::Response &res)
 {
-/*   // Check if object to modify is spawned in scene and proceed with modify operation 
-  moveit_msgs::CollisionObject collision_objects;
-  // Store collision objects currently in scene
-  std::map< std::string,moveit_msgs::CollisionObject > current_objects_ =  getObjects();
-
-  try{
-    collision_objects.push_back(current_objects_.at(req.object_id));
-  }catch (const std::out_of_range& e){
-    try{
-      std::vector<moveit_msgs::CollisionObject> sub_collision_objects = parsed_scene_objects_.at(req.object_id).getObjects();
-      for (auto collision_object: sub_collision_objects){
-        collision_objects.push_back(collision_object);} 
-    }catch (const std::out_of_range& e){
-      ROS_WARN("The object: %s is not spawned in scene, cannot be modified.", req.object_id.c_str());
-      return false;
-    }    
-  } 
-
-  geometry_msgs::Pose default_pose_msg = geometry_msgs::Pose();
-
-  for (auto collision_object: collision_objects){  
-    collision_object.operation = moveit_msgs::CollisionObject::ADD;
-    ROS_INFO("Modifying object: %s", collision_object.id.c_str());
-    if(req.pose != default_pose_msg){
-      collision_object
-    }
-
-  }
- */
    // Store collision objects currently in scene
   std::map< std::string,moveit_msgs::CollisionObject > current_objects_ =  getObjects();
 
@@ -370,28 +371,13 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
   return true;
 }
 
-bool SceneManager::moveToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res)
+bool SceneManager::moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res)
 {
-/*  res.result = detachObjects(req.names);
- if(!res.result){throw std::runtime_error("Could not detach all desired objects.");} */
-  planning_scene_monitor_->requestPlanningSceneState();
-  planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
-
-  geometry_msgs::PoseStamped pose;
-  Eigen::Isometry3d tf;
-  tf2::fromMsg(req.pose, tf);
-  pose.pose = tf2::toMsg(planning_scene->getFrameTransform((req.object + "/top")) * tf);
-  pose.header.frame_id = planning_scene->getPlanningFrame();
-
-
-  move_group_->clearPoseTargets();
-  move_group_->setJointValueTarget(pose);
-  moveit::planning_interface::MoveGroupInterface::Plan myplan;
-  if (move_group_->plan(myplan) && move_group_->execute(myplan)){
-/*     std::cout << "OK" << std::endl; */
-  }
-
-  return true;
+ res.result = moveRelativeTo(req.object, req.pose);
+ res.result = true;
+ ROS_INFO_STREAM("move relative to action: " << res.result);
+ if(!res.result){throw std::runtime_error("Could not move to goal position relative to desired object");}
+ return res.result;
 }
 
 void SceneManager::frameTimerCB()
@@ -405,7 +391,8 @@ void SceneManager::frameTimerCB()
   {
     if(planning_scene->knowsFrameTransform((current_object.id + "/top")))
     {
-      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform((current_object.id + "/top")), id, rviz_visual_tools::LARGE  );
+      /* visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform((current_object.id + "/top")), id, rviz_visual_tools::LARGE  ); */
+      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform((current_object.id)), id, rviz_visual_tools::LARGE  );
     }else
     {
       visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE  );

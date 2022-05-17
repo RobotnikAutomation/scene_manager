@@ -40,24 +40,27 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     SceneManager(ros::NodeHandle nh, bool wait);
     virtual ~SceneManager();
     void loadSceneYaml();
+
+    // Functionalities
     bool initScene();
     bool addObjects(std::vector<std::string> object_names);
     bool removeObjects(std::vector<std::string> object_names);
     bool attachObjects(std::vector<std::string> object_names);
     bool detachObjects(std::vector<std::string> object_names);
+    bool moveRelativeTo(std::string object_id, geometry_msgs::Pose rel_pose);
 
     // ROS Services
     ros::ServiceServer add_objects_srv;
     ros::ServiceServer remove_objects_srv;
     ros::ServiceServer attach_objects_srv;
     ros::ServiceServer detach_objects_srv;
-    ros::ServiceServer move_to_srv;
+    ros::ServiceServer move_relative_to_srv;
     ros::ServiceServer modify_object_srv;
     bool addObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool removeObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool attachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool detachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
-    bool moveToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res);
+    bool moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res);
     bool modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req, scene_manager_msgs::ModifyObject::Response &res);
     
     // Frame Timer Callback

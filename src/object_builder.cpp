@@ -6,6 +6,7 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
 
     pnh_ = pnh;
     id_ = id;
+
     pnh_.getParam("frame_id", frame_id_); 
     pnh_.getParam("pose", pose_); 
     pnh_.getParam("geometry", geometry_); 
@@ -14,6 +15,7 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
 
     matrix_ = pnh_.hasParam("layout");
 
+    clearObjects();
 
     // Fill in parent moveit collision object basic parameters
     parent_collision_object_.id = id_;
@@ -155,7 +157,6 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
     }
 
     // Set Pose 
-    Object_Builder::clearObjects();
     Object_Builder::setPose(pose_msg);
     if(matrix_)
     {
@@ -184,11 +185,8 @@ void Object_Builder::setLayout(int layout_x, int layout_y, int layout_z)
 
 void Object_Builder::setPose(geometry_msgs::Pose pose)
 {   
-    //Object_Builder::clearObjects();
     parent_collision_object_.pose = pose;
     parent_collision_object_.pose.position.z += parent_collision_object_.primitives[0].dimensions[2]/2; 
-    //collision_objects_.push_back(parent_collision_object_);
-    //Object_Builder::buildObjects();
 }
 
 void Object_Builder::clearObjects(){
@@ -245,7 +243,11 @@ void Object_Builder::buildObjects()
                 tf2::toMsg(toGlobalPose*toParentPose, global_child_pose_);
 
                 // Fill child collision object with computed global child pose
-                child_collision_object_.pose = global_child_pose_;  
+                child_collision_object_.pose = global_child_pose_; 
+
+                child_collision_object_.primitives[0].dimensions[0] = parent_collision_object_.primitives[0].dimensions[0] - 0.004;
+                child_collision_object_.primitives[0].dimensions[1] = parent_collision_object_.primitives[0].dimensions[1] - 0.004;
+                child_collision_object_.primitives[0].dimensions[2] = parent_collision_object_.primitives[0].dimensions[2] - 0.004; 
 
                 // Push back collision object into vector
                 collision_objects_.push_back(child_collision_object_);
@@ -257,7 +259,10 @@ void Object_Builder::buildObjects()
     }    
 
     if(collision_objects_.empty())
-    {   ROS_INFO_STREAM("collision objects empty");
+    {   
+/*         parent_collision_object_.primitive.dimensions[0] = length_*0.95;
+        parent_collision_object_.primitive.dimensions[1] = width_*0.95;
+        parent_collision_object_.primitive.dimensions[2] = height_*0.95; */
         collision_objects_.push_back(parent_collision_object_);
     }
 }
