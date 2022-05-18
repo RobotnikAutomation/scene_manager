@@ -43,11 +43,13 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
 
     // Functionalities
     bool initScene();
-    bool addObjects(std::vector<std::string> object_names);
-    bool removeObjects(std::vector<std::string> object_names);
-    bool attachObjects(std::vector<std::string> object_names);
-    bool detachObjects(std::vector<std::string> object_names);
-    bool moveRelativeTo(std::string object_id, geometry_msgs::Pose rel_pose);
+    bool addObjects(const std::vector<std::string>& object_names);
+    bool removeObjects(const std::vector<std::string>& object_names);
+    bool attachObjects(const std::vector<std::string>& object_names);
+    bool detachObjects(const std::vector<std::string>& object_names);
+    bool moveRelativeTo(const std::string& object_id, const geometry_msgs::Pose& rel_pose);
+    bool allowCollision(const std::string& name, const std::vector< std::string >& other_names);
+    bool restoreCollision(const std::string& name, const std::vector< std::string >& other_names);
 
     // ROS Services
     ros::ServiceServer add_objects_srv;
