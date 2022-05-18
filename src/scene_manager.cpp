@@ -113,18 +113,13 @@ bool SceneManager::initScene()
   return addObjects(spawn_objects_names_);
 }
 
-bool SceneManager::addObjects(std::vector<std::string> object_names)
+bool SceneManager::addObjects(const std::vector<std::string>& object_names)
 { 
   // Result
   bool result = true; 
 
   // Initialize vector of collision objects to load into scene
   std::vector <moveit_msgs::CollisionObject> collision_objects;
-
-  // If input vector is empty add all available static objects to scene
-/*   if(object_names.empty()){
-    object_names = static_objects_names_;
-  } */
 
   for (auto object_name: object_names){
     try{
@@ -155,20 +150,13 @@ bool SceneManager::addObjects(std::vector<std::string> object_names)
   return result && applyCollisionObjects(collision_objects);
 }
 
-bool SceneManager::removeObjects(std::vector<std::string> object_names)
+bool SceneManager::removeObjects(const std::vector<std::string>& object_names)
 { 
   // Result
   bool result = true;
 
   // Initialize vector of collision objects to load into scene
   std::vector <moveit_msgs::CollisionObject> collision_objects;
-
-  // If input vector is empty remove all objects in scene
-/*   if(object_names.empty()){
-    object_names = getKnownObjectNames();
-  } */
-
-
 
   // Store collision objects currently in scene
   std::map< std::string,moveit_msgs::CollisionObject > current_objects_ =  getObjects();
@@ -201,7 +189,7 @@ bool SceneManager::removeObjects(std::vector<std::string> object_names)
 
 
 
-bool SceneManager::attachObjects(std::vector<std::string> object_names)
+bool SceneManager::attachObjects(const std::vector<std::string>& object_names)
 {
   // Result
   bool result = true;
@@ -228,7 +216,7 @@ bool SceneManager::attachObjects(std::vector<std::string> object_names)
   return result && applyAttachedCollisionObjects(attached_objects);
 }
 
-bool SceneManager::detachObjects(std::vector<std::string> object_names)
+bool SceneManager::detachObjects(const std::vector<std::string>& object_names)
 {
   // Result
   bool result = true;
@@ -253,7 +241,7 @@ bool SceneManager::detachObjects(std::vector<std::string> object_names)
   return applyAttachedCollisionObjects(attached_objects); 
 }
 
-bool SceneManager::moveRelativeTo(std::string object_id, geometry_msgs::Pose rel_pose)
+bool SceneManager::moveRelativeTo(const std::string& object_id, const geometry_msgs::Pose& rel_pose)
 {
   planning_scene_monitor_->requestPlanningSceneState();
   planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
@@ -263,8 +251,22 @@ bool SceneManager::moveRelativeTo(std::string object_id, geometry_msgs::Pose rel
   geometry_msgs::PoseStamped pose;
   Eigen::Isometry3d tf;
   tf2::fromMsg(rel_pose, tf);
-  /* pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id + "/top")) * tf); */
-  pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id)) * tf);
+
+  // Check if object exists
+  if(planning_scene->knowsFrameTransform(object_id + "/center"))
+  {
+    pose.pose = tf2::toMsg(planning_scene->getFrameTransform(object_id + "/center") * tf);
+
+  }else if(planning_scene->knowsFrameTransform(object_id))
+  {
+    pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id)) * tf);
+
+  }else
+  {
+    ROS_WARN_STREAM("Object not present in planning scene, cannot move relative to object: " << object_id);
+    return false;
+  }
+
   pose.header.frame_id = planning_scene->getPlanningFrame();
   pose.header.stamp = ros::Time::now();
 
@@ -308,15 +310,35 @@ bool SceneManager::removeObjectsCB(scene_manager_msgs::SelectObjects::Request &r
 }
 
 bool SceneManager::attachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res)
-{
- res.result = attachObjects(req.names);
+{ 
+ if(req.names.empty() && (req.all == true)){
+  std::vector<std::string> objects;
+  std::map< std::string,moveit_msgs::CollisionObject > objects_map = getObjects();
+  for (auto & [id, object] : objects_map)
+  { 
+    objects.push_back(id);
+  }  
+  res.result = attachObjects(objects);
+ }else{   
+  res.result = attachObjects(req.names);
+ }
  if(!res.result){throw std::runtime_error("Could not attach all desired objects.");}
  return res.result;
 }
 
 bool SceneManager::detachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res)
 {
- res.result = detachObjects(req.names);
+ if(req.names.empty() && (req.all == true)){
+  std::vector<std::string> attached_objects;
+  std::map< std::string,moveit_msgs::AttachedCollisionObject > attached_objects_map = getAttachedObjects();
+  for (auto & [id, attached_object] : attached_objects_map)
+  { 
+    attached_objects.push_back(id);
+  }  
+  res.result = detachObjects(attached_objects);
+ }else{   
+  res.result = detachObjects(req.names);
+ }
  if(!res.result){throw std::runtime_error("Could not detach all desired objects.");}
  return res.result;
 }
@@ -331,43 +353,46 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
   scene_manager_msgs::Layout default_layout_msg = scene_manager_msgs::Layout();
 
   try{
-    moveit_msgs::CollisionObject collision_object = current_objects_.at(req.object_id);
-    collision_object.operation = moveit_msgs::CollisionObject::ADD;
+    
     if(req.pose != default_pose_msg)
     {
-      collision_object.pose = req.pose;
-      collision_object.pose.position.z += collision_object.primitives[0].dimensions[2]/2;
+      parsed_scene_objects_.at(req.object_id).setPose(req.pose);
     }
-    collision_objects.push_back(collision_object);
-    ROS_INFO("Modifying object: %s", req.object_id.c_str());
-  }catch (const std::out_of_range& e){
-    try{
 
-      /* Object_Builder parsed_object = parsed_scene_objects_.at(req.object_id); */
+    if(req.layout != default_layout_msg)
+    { 
+      removeObjects({req.object_id});
+      parsed_scene_objects_.at(req.object_id).setLayout(req.layout.x, req.layout.y, req.layout.z );
+    }
+
+    parsed_scene_objects_.at(req.object_id).buildObjects();
+
+    for (auto collision_object: parsed_scene_objects_.at(req.object_id).getObjects()){
+      collision_object.operation = moveit_msgs::CollisionObject::ADD;
+      collision_objects.push_back(collision_object);
+      ROS_INFO("Modifying object: %s", collision_object.id.c_str());
+    } 
+
+  }catch (const std::out_of_range& e){
+
+    try{
+      moveit_msgs::CollisionObject collision_object = current_objects_.at(req.object_id);
+      collision_object.operation = moveit_msgs::CollisionObject::ADD;
       if(req.pose != default_pose_msg)
       {
-        parsed_scene_objects_.at(req.object_id).setPose(req.pose);
+        collision_object.pose = req.pose;
       }
-
-      if(req.layout != default_layout_msg)
-      { 
-        removeObjects({req.object_id});
-        parsed_scene_objects_.at(req.object_id).setLayout(req.layout.x, req.layout.y, req.layout.z );
-      }
-      parsed_scene_objects_.at(req.object_id).buildObjects();
-
-      for (auto collision_object: parsed_scene_objects_.at(req.object_id).getObjects()){
-        collision_object.operation = moveit_msgs::CollisionObject::ADD;
-        collision_objects.push_back(collision_object);
-        ROS_INFO("Modifying object: %s", collision_object.id.c_str());
-      }  
+      collision_objects.push_back(collision_object);
+      ROS_INFO("Modifying object: %s", req.object_id.c_str());
     }catch (const std::out_of_range& e){
-/*       result = false; */
       ROS_WARN("The object: %s is not spawned in scene, cannot be modified.", req.object_id.c_str());
+      res.result = false;
+      return true;
     }    
+
   }  
 
-  applyCollisionObjects(collision_objects); 
+  res.result = applyCollisionObjects(collision_objects); 
   return true;
 }
 
@@ -376,9 +401,50 @@ bool SceneManager::moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, sc
  res.result = moveRelativeTo(req.object, req.pose);
  res.result = true;
  ROS_INFO_STREAM("move relative to action: " << res.result);
- if(!res.result){throw std::runtime_error("Could not move to goal position relative to desired object");}
+ if(!res.result){throw std::runtime_error("Could not move to goal position defined relative to desired object");}
  return res.result;
 }
+
+bool SceneManager::allowCollision(const std::string& name, const std::vector< std::string >& other_names)
+{
+  moveit_msgs::PlanningScene current_planning_scene_msg;
+  collision_detection::AllowedCollisionMatrix acm_;
+
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRW planning_scene(planning_scene_monitor_);
+ 
+  planning_scene->getPlanningSceneMsg(current_planning_scene_msg);
+  
+  acm_ = planning_scene->getAllowedCollisionMatrix();
+  acm_.setEntry(name, other_names, true);
+  acm_.getMessage(current_planning_scene_msg.allowed_collision_matrix);
+
+  current_planning_scene_msg.is_diff = true;
+  applyPlanningScene(current_planning_scene_msg);
+
+  return true;
+}
+
+bool SceneManager::restoreCollision(const std::string& name, const std::vector< std::string >& other_names)
+{
+  moveit_msgs::PlanningScene current_planning_scene_msg;
+  collision_detection::AllowedCollisionMatrix acm_;
+
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRW planning_scene(planning_scene_monitor_);
+ 
+  planning_scene->getPlanningSceneMsg(current_planning_scene_msg);
+  
+  acm_ = planning_scene->getAllowedCollisionMatrix();
+  acm_.setEntry(name, other_names, false);
+  acm_.getMessage(current_planning_scene_msg.allowed_collision_matrix);
+
+  current_planning_scene_msg.is_diff = true;
+  applyPlanningScene(current_planning_scene_msg);
+
+  return true;
+}
+
 
 void SceneManager::frameTimerCB()
 { 
@@ -389,10 +455,9 @@ void SceneManager::frameTimerCB()
   std::map< std::string,moveit_msgs::CollisionObject > current_objects =  getObjects();
   for (auto & [id, current_object] : current_objects)
   {
-    if(planning_scene->knowsFrameTransform((current_object.id + "/top")))
+    if(planning_scene->knowsFrameTransform(current_object.id + "/center"))
     {
-      /* visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform((current_object.id + "/top")), id, rviz_visual_tools::LARGE  ); */
-      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform((current_object.id)), id, rviz_visual_tools::LARGE  );
+      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id + "/center"), id, rviz_visual_tools::LARGE  );
     }else
     {
       visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE  );
