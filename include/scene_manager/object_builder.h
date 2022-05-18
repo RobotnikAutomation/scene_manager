@@ -57,6 +57,7 @@ class Object_Builder
     XmlRpc::XmlRpcValue geometry_; // Stores object geometry parameter
     XmlRpc::XmlRpcValue pose_; // Stores object pose parameter
     int layout_x_ = 0, layout_y_ = 0, layout_z_ = 0;
+    double length_, width_, height_;
   
     
     // Global Variables created in Object class after processing parameter info 
