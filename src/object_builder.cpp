@@ -21,18 +21,22 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
     parent_collision_object_.id = id_;
     parent_collision_object_.header.frame_id = frame_id_;
 
+    layout_x_ = 0;
+    layout_y_ = 0;
+    layout_z_ = 0;
+
     if(matrix_)
-    {   if(!pnh_.getParam("layout/x", layout_x_) || layout_x_ <=0)
+    {   if(!pnh_.getParam("layout/x", layout_x_) || layout_x_ < 1)
         {
-            throw std::runtime_error("Cannot process layout parameter for object: " + id_ + ", it should contain x parameter (positive integer), check object configuration yaml");
+            throw std::runtime_error("Cannot process layout parameter for object: " + id_ + ", it should contain x parameter (positive integer different from zero), check object configuration yaml");
         }
-        if(!pnh_.getParam("layout/y", layout_y_) || layout_y_ <=0)
+        if(!pnh_.getParam("layout/y", layout_y_) || layout_y_ < 1)
         {
-            throw std::runtime_error("Cannot process layout parameter for object: " + id_ + ", it should contain y parameter (positive integer), check object configuration yaml");
+            throw std::runtime_error("Cannot process layout parameter for object: " + id_ + ", it should contain y parameter (positive integer different from zero), check object configuration yaml");
         }
-        if(!pnh_.getParam("layout/z", layout_z_) || layout_z_ <=0)
+        if(!pnh_.getParam("layout/z", layout_z_) || layout_z_ < 1)
         {
-            throw std::runtime_error("Cannot process layout parameter for object: " + id_ + ", it should contain z parameter (positive integer), check object configuration yaml");
+            throw std::runtime_error("Cannot process layout parameter for object: " + id_ + ", it should contain z parameter (positive integer different from zero), check object configuration yaml");
         }
     }
 
@@ -103,20 +107,32 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
     if ( geometry_.hasMember("mesh")){
 
         std::string mesh_path_; 
-        pnh_.getParam("geometry/mesh", mesh_path_ );
+        pnh_.getParam("geometry/mesh/path", mesh_path_ );
 
         shape_msgs::Mesh mesh;
 
         shapes::Mesh* m = shapes::createMeshFromResource(mesh_path_); 
+
         shapes::ShapeMsg mesh_msg;  
         shapes::constructMsgFromShape(m, mesh_msg);
         mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
+
+        if(!pnh_.getParam("geometry/mesh/size/length", length_ )){
+            throw std::runtime_error("Cannot process geometry/mesh/size parameter for object: " + id_ + ", it should contain length parameter, check object configuration yaml");
+        }
+        if(!pnh_.getParam("geometry/mesh/size/width", width_ )){
+            throw std::runtime_error("Cannot process geometry/mesh/size parameter for object: " + id_ + ", it should contain width parameter, check object configuration yaml");
+        }
+        if(!pnh_.getParam("geometry/mesh/size/height", height_ )){
+            throw std::runtime_error("Cannot process geometry/mesh/size parameter for object: " + id_ + ", it should contain height parameter, check object configuration yaml");
+        }
+
         // Fill in moveit collision object geometry
         parent_collision_object_.meshes.push_back(mesh);
+        default_pose_msg.position.z = height_/2;
         parent_collision_object_.mesh_poses.push_back(default_pose_msg);
 
     }else if (geometry_.hasMember("box")){
-        double length_, width_, height_;
         
         shape_msgs::SolidPrimitive primitive; 
 
@@ -141,20 +157,21 @@ Object_Builder::Object_Builder(ros::NodeHandle pnh, std::string id)
     
         // Fill in moveit collision object geometry
         parent_collision_object_.primitives.push_back(primitive);
+        default_pose_msg.position.z = height_/2;
         parent_collision_object_.primitive_poses.push_back(default_pose_msg);
-
-        // Crate subframe at top surface
-        parent_collision_object_.subframe_names.resize(1);
-        parent_collision_object_.subframe_poses.resize(1);
-        parent_collision_object_.subframe_names[0] = "top";
-        parent_collision_object_.subframe_poses[0].position.z = height_/2;
-        tf2::Quaternion orientation;
-        orientation.setRPY(0, 0, 0);  
-        parent_collision_object_.subframe_poses[0].orientation = tf2::toMsg(orientation);
 
     }else{
         ROS_WARN("Cannot process geometry parameter, check object configuration yaml");
     }
+
+    // Crate subframe at center of object
+    parent_collision_object_.subframe_names.resize(1);
+    parent_collision_object_.subframe_poses.resize(1);
+    parent_collision_object_.subframe_names[0] = "center";
+    parent_collision_object_.subframe_poses[0].position.z = height_/2;
+    tf2::Quaternion orientation;
+    orientation.setRPY(0, 0, 0);  
+    parent_collision_object_.subframe_poses[0].orientation = tf2::toMsg(orientation);
 
     // Set Pose 
     Object_Builder::setPose(pose_msg);
@@ -173,7 +190,7 @@ Object_Builder::~Object_Builder(){
 void Object_Builder::setLayout(int layout_x, int layout_y, int layout_z)
 {   
     if (layout_x <=0 || layout_y <=0 || layout_z <=0){
-        ROS_ERROR_STREAM("Cannot process layout parameter for object: " + id_ + ", it should contain positive integers");
+        ROS_ERROR_STREAM("Cannot process layout parameter for object: " + id_ + ", it should contain positive integers different from zero");
     }else{
         this->layout_x_ = layout_x;
         this->layout_y_ = layout_y;
@@ -186,7 +203,6 @@ void Object_Builder::setLayout(int layout_x, int layout_y, int layout_z)
 void Object_Builder::setPose(geometry_msgs::Pose pose)
 {   
     parent_collision_object_.pose = pose;
-    parent_collision_object_.pose.position.z += parent_collision_object_.primitives[0].dimensions[2]/2; 
 }
 
 void Object_Builder::clearObjects(){
@@ -195,10 +211,11 @@ void Object_Builder::clearObjects(){
 
 void Object_Builder::buildObjects()
 {
-    Object_Builder::clearObjects();
 
-    if(layout_x_!=0 || layout_y_!=0 || layout_z_!=0 ){
+    if(layout_x_!=0 && layout_y_!=0 && layout_z_!=0 ){
 
+        // Clear objects
+        Object_Builder::clearObjects();
         // Declare needed variables
         int child_id_ = 1;
         geometry_msgs::Pose local_child_pose_,global_child_pose_;
@@ -212,18 +229,17 @@ void Object_Builder::buildObjects()
         // Matrix configuration
         crates_floor_ = layout_x_*layout_y_;
 
-        //  De momento solo para primitives 
-        double object_length_ = parent_collision_object_.primitives[0].dimensions[0];
-        double object_width_ = parent_collision_object_.primitives[0].dimensions[1];
-        double object_height_ = parent_collision_object_.primitives[0].dimensions[2];
+        double object_length_ = length_ + 0.005;
+        double object_width_ = width_ + 0.005;
+        double object_height_ = height_ + 0.005;
 
         matrix_base_length_ = object_length_*layout_x_; 
         matrix_base_width_ = object_width_*layout_y_;  
-        //matrix_base_height_ = parent_collision_object_.pose.position.z; 
 
         for(int z = 0; z <= (layout_z_-1)*crates_floor_; z+=crates_floor_)
         {
-            local_child_pose_.position.z = object_height_*z/crates_floor_;
+            local_child_pose_.position.z = object_height_*z/crates_floor_ + 0.005;
+
             for(int x = 0; x<layout_x_; x++)
             {
                 for(int y = 0; y<layout_y_; y++)
@@ -245,10 +261,6 @@ void Object_Builder::buildObjects()
                 // Fill child collision object with computed global child pose
                 child_collision_object_.pose = global_child_pose_; 
 
-                child_collision_object_.primitives[0].dimensions[0] = parent_collision_object_.primitives[0].dimensions[0] - 0.004;
-                child_collision_object_.primitives[0].dimensions[1] = parent_collision_object_.primitives[0].dimensions[1] - 0.004;
-                child_collision_object_.primitives[0].dimensions[2] = parent_collision_object_.primitives[0].dimensions[2] - 0.004; 
-
                 // Push back collision object into vector
                 collision_objects_.push_back(child_collision_object_);
 
@@ -258,11 +270,9 @@ void Object_Builder::buildObjects()
         }
     }    
 
-    if(collision_objects_.empty())
+    if(collision_objects_.size() <=1)
     {   
-/*         parent_collision_object_.primitive.dimensions[0] = length_*0.95;
-        parent_collision_object_.primitive.dimensions[1] = width_*0.95;
-        parent_collision_object_.primitive.dimensions[2] = height_*0.95; */
+        Object_Builder::clearObjects();
         collision_objects_.push_back(parent_collision_object_);
     }
 }
