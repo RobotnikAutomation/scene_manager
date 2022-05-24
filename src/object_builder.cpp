@@ -187,7 +187,7 @@ Object_Builder::~Object_Builder(){
     
 };
 
-void Object_Builder::setLayout(int layout_x, int layout_y, int layout_z)
+void Object_Builder::setLayout(const int& layout_x, const int& layout_y, const int& layout_z)
 {   
     if (layout_x <=0 || layout_y <=0 || layout_z <=0){
         ROS_ERROR_STREAM("Cannot process layout parameter for object: " + id_ + ", it should contain positive integers different from zero");
@@ -200,9 +200,14 @@ void Object_Builder::setLayout(int layout_x, int layout_y, int layout_z)
 
 
 
-void Object_Builder::setPose(geometry_msgs::Pose pose)
+void Object_Builder::setPose(const geometry_msgs::Pose& pose)
 {   
     parent_collision_object_.pose = pose;
+}
+
+void Object_Builder::setFrame(const std::string& frame)
+{   
+    parent_collision_object_.header.frame_id = frame;
 }
 
 void Object_Builder::clearObjects(){
@@ -280,6 +285,10 @@ void Object_Builder::buildObjects()
 
 std::vector<moveit_msgs::CollisionObject> Object_Builder::getObjects(){
     return collision_objects_;
+}
+
+std::vector<double> Object_Builder::getSize(){
+    return {length_, width_, height_};
 }
 
 bool Object_Builder::getSpawn(){
