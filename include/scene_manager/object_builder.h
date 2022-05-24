@@ -28,16 +28,14 @@ class Object_Builder
     // Query object type
     bool getSpawn();  // Spawn objects are spawned during init
     bool getStatic(); // Static objects are spawned during init and are always in scene
-    
+    std::vector<double> getSize();
     // Query object identity
     std::string getID();
 
     // Set object configuration parameters
-    void setPose(geometry_msgs::Pose pose);
-    void setLayout(int layout_x, int layout_y, int layout_z);
-
-    // Generate a matrix of collision objects
-    void buildLayout(int layout_x, int layout_y, int layout_z);
+    void setPose(const geometry_msgs::Pose& pose);
+    void setFrame(const std::string& frame);
+    void setLayout(const int& layout_x, const int& layout_y, const int& layout_z);
 
     // Collision objects
     std::vector<moveit_msgs::CollisionObject> getObjects(); // Retrieve generated output collision objects
