@@ -32,6 +32,7 @@
 //TF2
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 class SceneManager : public moveit::planning_interface::PlanningSceneInterface
 {
@@ -50,6 +51,7 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     bool moveRelativeTo(const std::string& object_id, const geometry_msgs::Pose& rel_pose);
     bool allowCollision(const std::string& name, const std::vector< std::string >& other_names);
     bool restoreCollision(const std::string& name, const std::vector< std::string >& other_names);
+    std::vector<double> getObjectSize(const std::string& object_id);
 
     // ROS Services
     ros::ServiceServer add_objects_srv;

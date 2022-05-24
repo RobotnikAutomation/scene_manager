@@ -26,7 +26,7 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));
     
     // Visualization publisher
-    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools("world","/moveit_visual_markers"));
+    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools(robot_base_link_,"/moveit_visual_markers"));
 
     visual_tools_->deleteAllMarkers();
 
@@ -50,11 +50,11 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     try
     {
       move_group_.reset(
-          new moveit::planning_interface::MoveGroupInterface("arm", move_group_tf2_buffer_, ros::WallDuration(move_group_timeout_)));
+          new moveit::planning_interface::MoveGroupInterface(group_name_, move_group_tf2_buffer_, ros::WallDuration(move_group_timeout_)));
     }
     catch (const std::runtime_error& e)
     {
-      ROS_ERROR("Cannot create move group with group name: arm. Is MoveIt running? Group name is correct?");
+      ROS_ERROR("Cannot create move group with group name: %s. Is MoveIt running? Group name is correct?", group_name_.c_str());
       ROS_INFO_STREAM("Exception: " << e.what());
     }
 
@@ -243,10 +243,11 @@ bool SceneManager::detachObjects(const std::vector<std::string>& object_names)
 
 bool SceneManager::moveRelativeTo(const std::string& object_id, const geometry_msgs::Pose& rel_pose)
 {
+  bool result;
   planning_scene_monitor_->requestPlanningSceneState();
   planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
   
-  move_group_->setEndEffectorLink("link_6");
+  move_group_->setEndEffectorLink(robot_eef_link_);
 
   geometry_msgs::PoseStamped pose;
   Eigen::Isometry3d tf;
@@ -270,19 +271,29 @@ bool SceneManager::moveRelativeTo(const std::string& object_id, const geometry_m
   pose.header.frame_id = planning_scene->getPlanningFrame();
   pose.header.stamp = ros::Time::now();
 
+  // Normalize quaternion and check if is valid
+  tf2::Quaternion quat_orientation;
+  tf2::fromMsg(pose.pose.orientation, quat_orientation);
+  quat_orientation.normalize();
+  pose.pose.orientation = tf2::toMsg(quat_orientation);
+
   move_group_->clearPoseTargets();
   
   ROS_INFO_STREAM("set goal pose : " << move_group_->setJointValueTarget(pose));
   ROS_INFO_STREAM("goal pose: " << pose);
   moveit::planning_interface::MoveGroupInterface::Plan myplan;
   ROS_INFO_STREAM("move relative to action executing");
-  if (move_group_->plan(myplan) && move_group_->execute(myplan)){
-    ROS_INFO_STREAM("move relative to action: " << true);
-    return true;
+  if (move_group_->plan(myplan)){
+    if(move_group_->execute(myplan)){
+      result = true;
+    }else{
+      result = false;
+    }
   }else{
     ROS_INFO_STREAM("move relative to action: " << false);
-    return false;
+    result = false;
   }
+  return result;
 }
 
 bool SceneManager::addObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res)
@@ -354,9 +365,10 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
 
   try{
     
-    if(req.pose != default_pose_msg)
+    if(req.pose.pose != default_pose_msg)
     {
-      parsed_scene_objects_.at(req.object_id).setPose(req.pose);
+      parsed_scene_objects_.at(req.object_id).setPose(req.pose.pose);
+      parsed_scene_objects_.at(req.object_id).setFrame(req.pose.header.frame_id);
     }
 
     if(req.layout != default_layout_msg)
@@ -378,9 +390,10 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
     try{
       moveit_msgs::CollisionObject collision_object = current_objects_.at(req.object_id);
       collision_object.operation = moveit_msgs::CollisionObject::ADD;
-      if(req.pose != default_pose_msg)
+      if(req.pose.pose != default_pose_msg)
       {
-        collision_object.pose = req.pose;
+        collision_object.pose = req.pose.pose;
+        collision_object.header.frame_id = req.pose.header.frame_id;
       }
       collision_objects.push_back(collision_object);
       ROS_INFO("Modifying object: %s", req.object_id.c_str());
@@ -399,10 +412,9 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
 bool SceneManager::moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res)
 {
  res.result = moveRelativeTo(req.object, req.pose);
- res.result = true;
  ROS_INFO_STREAM("move relative to action: " << res.result);
  if(!res.result){throw std::runtime_error("Could not move to goal position defined relative to desired object");}
- return res.result;
+ return true;
 }
 
 bool SceneManager::allowCollision(const std::string& name, const std::vector< std::string >& other_names)
@@ -467,3 +479,15 @@ void SceneManager::frameTimerCB()
 
 }
 
+std::vector<double> SceneManager::getObjectSize(const std::string& object_id)
+{
+  std::vector<double> dimensions;
+
+  try{
+    dimensions = parsed_scene_objects_.at(object_id).getSize();
+  }catch (const std::out_of_range& e){
+    ROS_WARN("The object: %s is not created using Scene Manager, cannot retrieve size.", object_id.c_str());
+  }    
+
+  return dimensions;
+}
