@@ -52,6 +52,8 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     bool allowCollision(const std::string& name, const std::vector< std::string >& other_names);
     bool restoreCollision(const std::string& name, const std::vector< std::string >& other_names);
     std::vector<double> getObjectSize(const std::string& object_id);
+    moveit_msgs::CollisionObject getObjectMsg(const std::string& object_id);
+  
 
     // ROS Services
     ros::ServiceServer add_objects_srv;

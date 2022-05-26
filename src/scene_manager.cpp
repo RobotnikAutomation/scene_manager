@@ -279,8 +279,8 @@ bool SceneManager::moveRelativeTo(const std::string& object_id, const geometry_m
 
   move_group_->clearPoseTargets();
   
-  ROS_INFO_STREAM("set goal pose : " << move_group_->setJointValueTarget(pose));
-  ROS_INFO_STREAM("goal pose: " << pose);
+  move_group_->setJointValueTarget(pose);
+
   moveit::planning_interface::MoveGroupInterface::Plan myplan;
   ROS_INFO_STREAM("move relative to action executing");
   if (move_group_->plan(myplan)){
@@ -477,6 +477,12 @@ void SceneManager::frameTimerCB()
   }
   visual_tools_->trigger();
 
+}
+
+moveit_msgs::CollisionObject SceneManager::getObjectMsg(const std::string& object_id)
+{
+  std::map< std::string, moveit_msgs::CollisionObject > object_map = 	getObjects({object_id});
+  return object_map.at(object_id);
 }
 
 std::vector<double> SceneManager::getObjectSize(const std::string& object_id)
