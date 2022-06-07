@@ -230,21 +230,44 @@ void Object_Builder::buildObjects()
         // Create temporary collision object and initialize with parent info
         moveit_msgs::CollisionObject child_collision_object_;
         child_collision_object_ = parent_collision_object_;
+
+        // Padd object    
+        for(int i = 0; i < parent_collision_object_.meshes.size(); i++)
+        {
+          auto mesh = shapes::constructShapeFromMsg(parent_collision_object_.meshes[i]);
+          mesh->padd(-0.01);
+          shape_msgs::Mesh padded_mesh;
+          shapes::ShapeMsg mesh_msg;  
+          shapes::constructMsgFromShape(mesh, mesh_msg);
+          padded_mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
+          // Fill in moveit collision object geometry
+          child_collision_object_.meshes[i] = padded_mesh;
+        }
+
+        for(int i = 0; i < parent_collision_object_.primitives.size(); i++)
+        {
+          auto shape = shapes::constructShapeFromMsg(parent_collision_object_.primitives[i]);
+          shape->padd(-0.01);
+          shapes::ShapeMsg shape_msg;  
+          shapes::constructMsgFromShape(shape, shape_msg);
+          shape_msgs::SolidPrimitive padded_shape;
+          padded_shape = boost::get<shape_msgs::SolidPrimitive>(shape_msg);
+          child_collision_object_.primitives[i] = padded_shape;
+        }
         
         // Matrix configuration
         crates_floor_ = layout_x_*layout_y_;
 
-        double object_length_ = length_ + 0.005;
-        double object_width_ = width_ + 0.005;
-        double object_height_ = height_ + 0.005;
+        double object_length_ = length_;
+        double object_width_ = width_;
+        double object_height_ = height_;
 
         matrix_base_length_ = object_length_*layout_x_; 
         matrix_base_width_ = object_width_*layout_y_;  
 
         for(int z = 0; z <= (layout_z_-1)*crates_floor_; z+=crates_floor_)
         {
-            local_child_pose_.position.z = object_height_*z/crates_floor_ + 0.005;
-
+            local_child_pose_.position.z = object_height_*z/crates_floor_;
             for(int x = 0; x<layout_x_; x++)
             {
                 for(int y = 0; y<layout_y_; y++)
