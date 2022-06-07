@@ -24,6 +24,9 @@
 #include <moveit_msgs/CollisionObject.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <geometric_shapes/shapes.h>
+#include <geometric_shapes/mesh_operations.h>
+#include <geometric_shapes/shape_operations.h>
 
 //VISUALIZATION
 #include <moveit_visual_tools/moveit_visual_tools.h>
@@ -53,6 +56,7 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     bool restoreCollision(const std::string& name, const std::vector< std::string >& other_names);
     std::vector<double> getObjectSize(const std::string& object_id);
     moveit_msgs::CollisionObject getObjectMsg(const std::string& object_id);
+    bool paddObject(const std::string& object_name, const double& padding);
   
 
     // ROS Services

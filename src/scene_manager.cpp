@@ -497,3 +497,62 @@ std::vector<double> SceneManager::getObjectSize(const std::string& object_id)
 
   return dimensions;
 }
+
+bool SceneManager::paddObject(const std::string& object_name, const double& padding)
+{
+  // Result
+  bool result = true; 
+
+  // Initialize vector of collision objects to load into scene
+  std::vector <moveit_msgs::CollisionObject> collision_objects;
+
+  // Retrieve objects in scene
+  std::map< std::string,moveit_msgs::CollisionObject > current_objects_ = getObjects();
+
+  // Check if object to padd is in scene and proceed with padding
+  try{
+    // Check if object to add is available in node database and proceed with spawn operation 
+    moveit_msgs::CollisionObject collision_object = current_objects_.at(object_name);
+
+    // Padd object
+    for(int i = 0; i < collision_object.meshes.size(); i++){
+      auto mesh = shapes::constructShapeFromMsg(collision_object.meshes[i]);
+      mesh->padd(padding);
+      shape_msgs::Mesh padded_mesh;
+      shapes::ShapeMsg mesh_msg;  
+      shapes::constructMsgFromShape(mesh, mesh_msg);
+      padded_mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
+      // Fill in moveit collision object geometry
+      collision_object.meshes[i] = padded_mesh;
+    }
+    for(int i = 0; i < collision_object.primitives.size(); i++){
+      auto shape = shapes::constructShapeFromMsg(collision_object.primitives[i]);
+      shape->padd(padding);
+      shapes::ShapeMsg shape_msg;  
+      shapes::constructMsgFromShape(shape, shape_msg);
+      shape_msgs::SolidPrimitive padded_shape;
+      padded_shape = boost::get<shape_msgs::SolidPrimitive>(shape_msg);
+      collision_object.primitives[i] = padded_shape;
+    }
+    // Check if object frame exists
+    tfBuffer_->lookupTransform(robot_base_link_,collision_object.header.frame_id,ros::Time(0),ros::Duration(1.0));
+    // Add collision object
+    collision_object.operation = moveit_msgs::CollisionObject::ADD;
+    collision_objects.push_back(collision_object);
+    ROS_INFO("Adding object: %s", collision_object.id.c_str());
+  }
+  catch (const std::out_of_range& e)
+  {
+    result = false;
+    ROS_ERROR("The object: %s does not exist in Planning scene, cannot be padded.", object_name.c_str());
+  }
+  catch(tf2::TransformException ex)
+  {
+    result = false;
+    ROS_ERROR("Error when adding %s object to desired frame. Lookup Transform error: %s", object_name.c_str(), ex.what());
+  }   
+
+  // Modify objects in the scene
+  return result && applyCollisionObjects(collision_objects);
+}
+
