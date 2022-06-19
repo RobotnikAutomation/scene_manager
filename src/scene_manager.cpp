@@ -380,7 +380,7 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
     parsed_scene_objects_.at(req.object_id).buildObjects();
 
     for (auto collision_object: parsed_scene_objects_.at(req.object_id).getObjects()){
-      collision_object.operation = moveit_msgs::CollisionObject::ADD;
+      collision_object.operation = moveit_msgs::CollisionObject::MOVE;
       collision_objects.push_back(collision_object);
       ROS_INFO("Modifying object: %s", collision_object.id.c_str());
     } 
@@ -389,7 +389,7 @@ bool SceneManager::modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req
 
     try{
       moveit_msgs::CollisionObject collision_object = current_objects_.at(req.object_id);
-      collision_object.operation = moveit_msgs::CollisionObject::ADD;
+      collision_object.operation = moveit_msgs::CollisionObject::MOVE;
       if(req.pose.pose != default_pose_msg)
       {
         collision_object.pose = req.pose.pose;
