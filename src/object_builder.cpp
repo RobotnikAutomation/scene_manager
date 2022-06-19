@@ -235,7 +235,7 @@ void Object_Builder::buildObjects()
         for(int i = 0; i < parent_collision_object_.meshes.size(); i++)
         {
           auto mesh = shapes::constructShapeFromMsg(parent_collision_object_.meshes[i]);
-          mesh->padd(-0.01);
+          mesh->padd(-0.015);
           shape_msgs::Mesh padded_mesh;
           shapes::ShapeMsg mesh_msg;  
           shapes::constructMsgFromShape(mesh, mesh_msg);
@@ -247,7 +247,7 @@ void Object_Builder::buildObjects()
         for(int i = 0; i < parent_collision_object_.primitives.size(); i++)
         {
           auto shape = shapes::constructShapeFromMsg(parent_collision_object_.primitives[i]);
-          shape->padd(-0.01);
+          shape->padd(-0.015);
           shapes::ShapeMsg shape_msg;  
           shapes::constructMsgFromShape(shape, shape_msg);
           shape_msgs::SolidPrimitive padded_shape;
@@ -268,9 +268,9 @@ void Object_Builder::buildObjects()
         for(int z = 0; z <= (layout_z_-1)*crates_floor_; z+=crates_floor_)
         {
             local_child_pose_.position.z = object_height_*z/crates_floor_;
-            for(int x = 0; x<layout_x_; x++)
+            for(int y = 0; y<layout_y_; y++)
             {
-                for(int y = 0; y<layout_y_; y++)
+                for(int x = 0; x<layout_x_; x++)
                 {
                 // Child collision object pose with respect to parent collision object    
                 child_collision_object_.id  = parent_collision_object_.id + "_" + std::to_string(child_id_);
