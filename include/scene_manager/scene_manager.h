@@ -3,8 +3,15 @@
 
 //ROS
 #include <ros/ros.h>
+
+//TF2
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_eigen/tf2_eigen.h>
+#include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/buffer.h>
+
 
 //CPP
 #include <string>
@@ -32,10 +39,6 @@
 #include <moveit_visual_tools/moveit_visual_tools.h>
 #include <rviz_visual_tools/rviz_visual_tools.h>
 
-//TF2
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_eigen/tf2_eigen.h>
-#include <tf2/LinearMath/Quaternion.h>
 
 class SceneManager : public moveit::planning_interface::PlanningSceneInterface
 {
@@ -87,6 +90,7 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     ros::NodeHandle pnh_; // private node handle
     std::shared_ptr<tf2_ros::TransformListener> tfListener_{nullptr}; // tf listener
     std::unique_ptr<tf2_ros::Buffer> tfBuffer_; // tf buffer
+    tf2_ros::TransformBroadcaster tf_broadcaster_;
     std::string robot_base_link_; // Robot base link name  
     std::string robot_eef_link_; // Robot end-effector link name  
     std::string group_name_; // MoveIt robot group name
@@ -94,6 +98,7 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     std::vector<std::string> static_objects_names_; // List of names of static objects in scene
     std::vector<std::string> spawn_objects_names_; // List of names of objects to spawn in scene during init
     std::vector<std::string> scene_objects_names_; // List of names of all objects available in scene. 
+    bool publish_tf_; // Set to true to publish tf of objects in tf tree
 
     // For visualizing things in rviz
     moveit_visual_tools::MoveItVisualToolsPtr visual_tools_;

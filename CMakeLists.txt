@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
   moveit_msgs
   scene_manager_msgs
+  tf_conversions
+  eigen_conversions
 )
 
 catkin_package(

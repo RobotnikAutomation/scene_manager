@@ -13,6 +13,7 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     pnh_.param<std::string>("end_effector_link", robot_eef_link_, robot_eef_link_);
     pnh_.param<std::string>("group_name", group_name_, group_name_);
     pnh_.param<double>("move_group_timeout", move_group_timeout_, move_group_timeout_);
+    pnh_.param<bool>("publish_tf", publish_tf_, publish_tf_);    
     
     // Service
     add_objects_srv = nh_.advertiseService("add_objects", &SceneManager::addObjectsCB,this);
@@ -24,11 +25,6 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
 
     // Visualization timer
     frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));
-    
-    // Visualization publisher
-    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools(robot_base_link_,"/moveit_visual_markers"));
-
-    visual_tools_->deleteAllMarkers();
 
     // Initialize tf listener and buffer ros objects
     tfBuffer_ = std::make_unique<tf2_ros::Buffer>();
@@ -57,6 +53,15 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
       ROS_ERROR("Cannot create move group with group name: %s. Is MoveIt running? Group name is correct?", group_name_.c_str());
       ROS_INFO_STREAM("Exception: " << e.what());
     }
+
+    // Retrieve moveit configuration
+    robot_base_link_ = move_group_->getPlanningFrame();
+    robot_eef_link_ = move_group_->getEndEffectorLink();
+
+    // Visualization publisher
+    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools(robot_base_link_,"/moveit_visual_markers"));
+
+    visual_tools_->deleteAllMarkers();
 
     // Read and store scene description
     loadSceneYaml();
@@ -466,18 +471,32 @@ bool SceneManager::restoreCollision(const std::string& name, const std::vector< 
 void SceneManager::frameTimerCB()
 { 
   visual_tools_->deleteAllMarkers();
+  planning_scene_monitor_->updateFrameTransforms();
   planning_scene_monitor_->requestPlanningSceneState();
-  planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);
+  planning_scene_monitor::LockedPlanningSceneRO planning_scene(planning_scene_monitor_);  
 
   std::map< std::string,moveit_msgs::CollisionObject > current_objects =  getObjects();
+  Eigen::Isometry3d object_transform;
   for (auto & [id, current_object] : current_objects)
   {
     if(planning_scene->knowsFrameTransform(current_object.id + "/center"))
     {
-      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id + "/center"), id, rviz_visual_tools::LARGE  );
+      object_transform = planning_scene->getFrameTransform(current_object.id + "/center");
+      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id + "/center"), id, rviz_visual_tools::LARGE);
     }else
     {
-      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE  );
+      object_transform= planning_scene->getFrameTransform(current_object.id);
+      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE);
+    }
+
+    visual_tools_->publishAxisLabeled(object_transform, id, rviz_visual_tools::LARGE);
+    
+    if(publish_tf_){
+      geometry_msgs::TransformStamped object_transform_msg = tf2::eigenToTransform(object_transform);
+      object_transform_msg.header.frame_id = robot_base_link_;
+      object_transform_msg.header.stamp = ros::Time::now();
+      object_transform_msg.child_frame_id = current_object.id; 
+      tf_broadcaster_.sendTransform(object_transform_msg);
     }
   }
   visual_tools_->trigger();
