@@ -284,11 +284,11 @@ bool SceneManager::moveRelativeTo(const std::string& object_id, const geometry_m
 
   move_group_->clearPoseTargets();
   
-  move_group_->setJointValueTarget(pose);
+  bool pose_check = move_group_->setJointValueTarget(pose);
 
   moveit::planning_interface::MoveGroupInterface::Plan myplan;
   ROS_INFO_STREAM("move relative to action executing");
-  if (move_group_->plan(myplan)){
+  if (move_group_->plan(myplan) && pose_check){
     if(move_group_->execute(myplan)){
       result = true;
     }else{
