@@ -29,6 +29,7 @@
   <depend>xacro</depend>
   <depend>actionlib_msgs</depend>
   <depend>scene_manager_msgs</depend>
+  <depend>moveit_visual_tools</depend>
   
 
 

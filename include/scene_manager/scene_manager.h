@@ -29,6 +29,7 @@
 //MOVEIT
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/CollisionObject.h>
+#include <moveit_msgs/ApplyPlanningScene.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <geometric_shapes/shapes.h>
@@ -75,6 +76,9 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     bool detachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res);
     bool modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req, scene_manager_msgs::ModifyObject::Response &res);
+    
+    // Service Client
+    ros::ServiceClient planning_scene_diff_client_;
     
     // Frame Timer Callback
     void frameTimerCB();

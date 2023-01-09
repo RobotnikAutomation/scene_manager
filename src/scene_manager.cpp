@@ -23,6 +23,10 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     move_relative_to_srv = nh_.advertiseService("move_relative_to", &SceneManager::moveRelativeToCB,this);
     modify_object_srv = nh_.advertiseService("modify_object", &SceneManager::modifyObjectCB,this);
 
+    // Service client
+    planning_scene_diff_client_ = nh_.serviceClient<moveit_msgs::ApplyPlanningScene>("/apply_planning_scene");
+    planning_scene_diff_client_.waitForExistence();
+
     // Visualization timer
     frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));
 
@@ -261,8 +265,9 @@ bool SceneManager::moveRelativeTo(const std::string& object_id, const geometry_m
   // Check if object exists
   if(planning_scene->knowsFrameTransform(object_id + "/center"))
   {
-    pose.pose = tf2::toMsg(planning_scene->getFrameTransform(object_id + "/center") * tf);
-
+    /* pose.pose = tf2::toMsg(planning_scene->getFrameTransform(object_id + "/center") * tf); */
+    pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id)) * tf);
+    
   }else if(planning_scene->knowsFrameTransform(object_id))
   {
     pose.pose = tf2::toMsg(planning_scene->getFrameTransform((object_id)) * tf);
@@ -442,7 +447,12 @@ bool SceneManager::allowCollision(const std::string& name, const std::vector< st
   acm_.getMessage(current_planning_scene_msg.allowed_collision_matrix);
 
   current_planning_scene_msg.is_diff = true;
-  applyPlanningScene(current_planning_scene_msg);
+
+  moveit_msgs::ApplyPlanningScene srv;
+  srv.request.scene = current_planning_scene_msg;
+  planning_scene_diff_client_.call(srv);
+
+  //applyPlanningScene(current_planning_scene_msg);
 
   return true;
 }
@@ -479,15 +489,10 @@ void SceneManager::frameTimerCB()
   Eigen::Isometry3d object_transform;
   for (auto & [id, current_object] : current_objects)
   {
-    if(planning_scene->knowsFrameTransform(current_object.id + "/center"))
-    {
-      object_transform = planning_scene->getFrameTransform(current_object.id + "/center");
-      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id + "/center"), id, rviz_visual_tools::LARGE);
-    }else
-    {
-      object_transform= planning_scene->getFrameTransform(current_object.id);
-      visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE);
-    }
+
+    object_transform= planning_scene->getFrameTransform(current_object.id);
+    visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE);
+  
 
     visual_tools_->publishAxisLabeled(object_transform, id, rviz_visual_tools::LARGE);
     

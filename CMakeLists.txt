@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   scene_manager_msgs
   tf_conversions
   eigen_conversions
+  moveit_visual_tools
 )
 
 catkin_package(
