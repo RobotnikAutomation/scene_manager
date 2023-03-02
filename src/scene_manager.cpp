@@ -532,6 +532,40 @@ bool SceneManager::paddObject(const std::string& object_name, const double& padd
   // Result
   bool result = true; 
 
+  std::map< std::string,moveit_msgs::AttachedCollisionObject > current_attached_objects_ =  getAttachedObjects();
+  
+  try
+  {
+    // Check if object to add is available in node database and proceed with spawn operation 
+    moveit_msgs::AttachedCollisionObject collision_object = current_attached_objects_.at(object_name);
+    // Padd object
+    for(int i = 0; i < collision_object.object.meshes.size(); i++){
+      auto mesh = shapes::constructShapeFromMsg(collision_object.object.meshes[i]);
+      mesh->padd(padding);
+      shape_msgs::Mesh padded_mesh;
+      shapes::ShapeMsg mesh_msg;  
+      shapes::constructMsgFromShape(mesh, mesh_msg);
+      padded_mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
+      // Fill in moveit collision object geometry
+      collision_object.object.meshes[i] = padded_mesh;
+    }
+    for(int i = 0; i < collision_object.object.primitives.size(); i++){
+      auto shape = shapes::constructShapeFromMsg(collision_object.object.primitives[i]);
+      shape->padd(padding);
+      shapes::ShapeMsg shape_msg;  
+      shapes::constructMsgFromShape(shape, shape_msg);
+      shape_msgs::SolidPrimitive padded_shape;
+      padded_shape = boost::get<shape_msgs::SolidPrimitive>(shape_msg);
+      collision_object.object.primitives[i] = padded_shape;
+    }
+    
+    // Modify objects in the scene
+    return result && applyAttachedCollisionObject(collision_object);
+  }
+  catch (const std::out_of_range& e)
+  {
+
+  }
   // Initialize vector of collision objects to load into scene
   std::vector <moveit_msgs::CollisionObject> collision_objects;
 
