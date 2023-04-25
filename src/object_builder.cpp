@@ -325,3 +325,10 @@ bool Object_Builder::getStatic(){
 std::string Object_Builder::getID(){
     return id_;
 }
+
+geometry_msgs::PoseStamped Object_Builder::getPose(){
+    geometry_msgs::PoseStamped parent_pose_stamped;
+    parent_pose_stamped.pose =  parent_collision_object_.pose;
+    parent_pose_stamped.header.frame_id = parent_collision_object_.header.frame_id;
+    return parent_pose_stamped;
+}

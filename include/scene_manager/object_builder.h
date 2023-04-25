@@ -31,6 +31,8 @@ class Object_Builder
     std::vector<double> getSize();
     // Query object identity
     std::string getID();
+    // Query parent object pose
+    geometry_msgs::PoseStamped getPose();
 
     // Set object configuration parameters
     void setPose(const geometry_msgs::Pose& pose);

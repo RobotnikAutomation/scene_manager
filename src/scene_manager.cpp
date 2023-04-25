@@ -527,6 +527,19 @@ std::vector<double> SceneManager::getObjectSize(const std::string& object_id)
   return dimensions;
 }
 
+geometry_msgs::PoseStamped SceneManager::getObjectPose(const std::string& object_id)
+{
+  geometry_msgs::PoseStamped parent_pose;
+
+  try{
+    parent_pose = parsed_scene_objects_.at(object_id).getPose();
+  }catch (const std::out_of_range& e){
+    ROS_WARN("The object: %s is not created using Scene Manager, cannot retrieve parent pose.", object_id.c_str());
+  }    
+
+  return parent_pose;
+}
+
 bool SceneManager::paddObject(const std::string& object_name, const double& padding)
 {
   // Result
