@@ -9,4 +9,8 @@ publish_tf: true
 end_effector_link: tool0
 robot_base_link: base_link
 
+#Mongodb
+host: "localhost"
+port: 33829
+
 

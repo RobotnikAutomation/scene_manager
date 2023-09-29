@@ -14,7 +14,9 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     pnh_.param<std::string>("group_name", group_name_, group_name_);
     pnh_.param<double>("move_group_timeout", move_group_timeout_, move_group_timeout_);
     pnh_.param<bool>("publish_tf", publish_tf_, publish_tf_);    
-    
+    pnh_.param<std::string>("host", host_, host_);
+    pnh_.param<int>("port", port_, port_);
+
     // Service
     add_objects_srv = nh_.advertiseService("add_objects", &SceneManager::addObjectsCB,this);
     remove_objects_srv = nh_.advertiseService("remove_objects", &SceneManager::removeObjectsCB,this);
@@ -22,7 +24,9 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     detach_objects_srv = nh_.advertiseService("detach_objects", &SceneManager::detachObjectsCB,this);
     move_relative_to_srv = nh_.advertiseService("move_relative_to", &SceneManager::moveRelativeToCB,this);
     modify_object_srv = nh_.advertiseService("modify_object", &SceneManager::modifyObjectCB,this);
-
+    save_scene_srv = nh_.advertiseService("save_scene", &SceneManager::saveSceneCB,this);
+    load_scene_srv = nh_.advertiseService("load_scene", &SceneManager::loadSceneCB,this);
+    
     // Service client
     planning_scene_diff_client_ = nh_.serviceClient<moveit_msgs::ApplyPlanningScene>("/apply_planning_scene");
     planning_scene_diff_client_.waitForExistence();
@@ -69,6 +73,21 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
 
     // Read and store scene description
     loadSceneYaml();
+
+    // Connect to moveit's warehouse mongo db database
+    conn_ = moveit_warehouse::loadDatabase();
+    conn_->setParams(host_, port_);
+
+    ROS_INFO("Connecting to warehouse on %s:%d", host_.c_str(), port_);
+
+    while (!conn_->connect())
+    {
+      ROS_ERROR("Failed to connect to DB on %s:%d ", host_.c_str(), port_);
+      ros::Duration(2).sleep();
+      conn_->setParams(host_, port_);
+    }
+
+    scene_storage_.reset(new moveit_warehouse::PlanningSceneStorage(conn_));
 }
 
 SceneManager::~SceneManager(){
@@ -430,6 +449,34 @@ bool SceneManager::moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, sc
  ROS_INFO_STREAM("move relative to action: " << res.result);
  if(!res.result){throw std::runtime_error("Could not move to goal position defined relative to desired object");}
  return true;
+}
+
+bool SceneManager::saveSceneCB(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res)
+{
+/*   res.success = scene_manager_->initScene();
+  res.message = "Initializing planning scene"; */
+  moveit_msgs::PlanningScene current_planning_scene_msg;
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRW planning_scene(planning_scene_monitor_);
+  planning_scene->getPlanningSceneMsg(current_planning_scene_msg);
+  current_planning_scene_msg.name = "saved_scene";
+  res.message = "Stored planning scene";
+  res.success = true;
+  scene_storage_->addPlanningScene(current_planning_scene_msg);
+  return true;
+}
+
+bool SceneManager::loadSceneCB(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res)
+{
+/*   res.success = scene_manager_->initScene();
+  res.message = "Initializing planning scene"; */
+  moveit_msgs::PlanningSceneWorld scene_world;
+  std::string scene_name = "saved_scene";
+  scene_storage_->getPlanningSceneWorld(scene_world, scene_name);
+  res.message = "Loading stored planning scene";
+  res.success = true;
+  addCollisionObjects(scene_world.collision_objects);
+  return true;
 }
 
 bool SceneManager::allowCollision(const std::string& name, const std::vector< std::string >& other_names)

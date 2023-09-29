@@ -3,6 +3,7 @@
 
 //ROS
 #include <ros/ros.h>
+#include <std_srvs/Trigger.h>
 
 //TF2
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -17,6 +18,7 @@
 #include <string>
 #include <map>
 #include <iostream>
+
 
 //Custom
 #include <scene_manager/object_builder.h>
@@ -35,6 +37,13 @@
 #include <geometric_shapes/shapes.h>
 #include <geometric_shapes/mesh_operations.h>
 #include <geometric_shapes/shape_operations.h>
+
+//MOVEIT PLANNING SCENE
+#include <moveit_msgs/PlanningScene.h>
+
+//MONGODB
+#include <warehouse_ros/database_connection.h>
+#include <moveit/warehouse/planning_scene_storage.h>
 
 //VISUALIZATION
 #include <moveit_visual_tools/moveit_visual_tools.h>
@@ -71,13 +80,17 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     ros::ServiceServer detach_objects_srv;
     ros::ServiceServer move_relative_to_srv;
     ros::ServiceServer modify_object_srv;
+    ros::ServiceServer save_scene_srv;
+    ros::ServiceServer load_scene_srv;
     bool addObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool removeObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool attachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool detachObjectsCB(scene_manager_msgs::SelectObjects::Request &req, scene_manager_msgs::SelectObjects::Response &res);
     bool moveRelativeToCB(scene_manager_msgs::MoveTo::Request &req, scene_manager_msgs::MoveTo::Response &res);
     bool modifyObjectCB(scene_manager_msgs::ModifyObject::Request &req, scene_manager_msgs::ModifyObject::Response &res);
-    
+    bool saveSceneCB(std_srvs::Trigger::Request &req, std_srvs::TriggerResponse &res);
+    bool loadSceneCB(std_srvs::Trigger::Request &req, std_srvs::TriggerResponse &res);
+
     // Service Client
     ros::ServiceClient planning_scene_diff_client_;
     
@@ -115,6 +128,12 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
     //ros::WallDuration move_group_timeout_ = ros::WallDuration(20);
     std::shared_ptr<tf2_ros::Buffer> move_group_tf2_buffer_; 
     moveit::planning_interface::MoveGroupInterfacePtr move_group_;
+
+    // MongoDB database
+    warehouse_ros::DatabaseConnection::Ptr conn_;
+    std::string host_;
+    int port_;
+    std::unique_ptr<moveit_warehouse::PlanningSceneStorage> scene_storage_;
 };
 
 #endif // _COROSECT_MOVEIT_CONFIG__SCENE_MANAGER_H_
