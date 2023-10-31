@@ -470,12 +470,17 @@ bool SceneManager::loadSceneCB(std_srvs::Trigger::Request &req, std_srvs::Trigge
 {
 /*   res.success = scene_manager_->initScene();
   res.message = "Initializing planning scene"; */
-  moveit_msgs::PlanningSceneWorld scene_world;
+  moveit_warehouse::PlanningSceneWithMetadata stored_planning_scene_data;
+  moveit_msgs::PlanningScene stored_planning_scene_msg;
   std::string scene_name = "saved_scene";
-  scene_storage_->getPlanningSceneWorld(scene_world, scene_name);
+  scene_storage_->getPlanningScene (stored_planning_scene_data, scene_name);
+  stored_planning_scene_msg = *stored_planning_scene_data;
   res.message = "Loading stored planning scene";
   res.success = true;
-  addCollisionObjects(scene_world.collision_objects);
+  stored_planning_scene_msg.is_diff = true;
+  moveit_msgs::ApplyPlanningScene srv;
+  srv.request.scene = stored_planning_scene_msg;
+  planning_scene_diff_client_.call(srv);
   return true;
 }
 
