@@ -59,10 +59,10 @@ Allows user to easily add Collision Objects into a Planning Scene, for each obje
     <p align="justify">
         <div class="row">
           <div class="column">
-            <img src="images/YAML.png" height="360>
+            <img src="images/YAML.png" height="300>
           </div>
           <div class="column">
-            <img src="images/collision_objects.png" height="360">
+            <img src="images/collision_objects.png" height="300">
           </div>
         </div>
     </p> 
