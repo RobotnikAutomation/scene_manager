@@ -71,14 +71,14 @@ Allows user to easily add Collision Objects into a Planning Scene, for each obje
 
 Scene Manager class exposes the following methods:
 
-- **SceneManager::initScene() ->** Adds objects defined in YAML file to the Planning Scene.
-- **SceneManager::addObjects(vector< string > object_ids)** -> Add specific object to Planning Scene. 
-- **SceneManager::removeObjects(vector< string > object_ids) ->** Remove specific object to Planning Scene.
-- **SceneManager::attachObjects(vector< string > object_ids) ->** Attach collision object to end-effector. 
-- **SceneManager::detachObjects(vector< string > object_ids) ->** Detach collision object to end-effector. 
-- **SceneManager::moveRelativeTo(string object_id, rel_pose) ->** Move end-effector with a relative pose with respect to a given object's frame id.
-- **SceneManager::allowCollision(string link_id, vector< string > objects_id) ->** Allows collision between a robot link or a collision object with respect to other collision object. 
-- **SceneManager::restoreCollision(string link_id, vector< string > objects_id) ->** Restores collision avoidance between a robot link or a collision object with respect to other collision object. 
+- **SceneManager::initScene()** : Adds objects defined in YAML file to the Planning Scene.
+- **SceneManager::addObjects(vector< string > object_ids)** : Add specific object to Planning Scene. 
+- **SceneManager::removeObjects(vector< string > object_ids)** : Remove specific object to Planning Scene.
+- **SceneManager::attachObjects(vector< string > object_ids)** : Attach collision object to end-effector. 
+- **SceneManager::detachObjects(vector< string > object_ids)** : Detach collision object to end-effector. 
+- **SceneManager::moveRelativeTo(string object_id, rel_pose)** : Move end-effector with a relative pose with respect to a given object's frame id.
+- **SceneManager::allowCollision(string link_id, vector< string > objects_id)** : Allows collision between a robot link or a collision object with respect to other collision object. 
+- **SceneManager::restoreCollision(string link_id, vector< string > objects_id)** : Restores collision avoidance between a robot link or a collision object with respect to other collision object. 
 
 ### Scene Manager ROS Services:
 
