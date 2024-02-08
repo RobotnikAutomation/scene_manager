@@ -28,11 +28,10 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     load_scene_srv = nh_.advertiseService("load_scene", &SceneManager::loadSceneCB,this);
     
     // Service client
-    planning_scene_diff_client_ = nh_.serviceClient<moveit_msgs::ApplyPlanningScene>("/apply_planning_scene");
+    planning_scene_diff_client_ = nh.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
     planning_scene_diff_client_.waitForExistence();
 
-    // Visualization timer
-    frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));
+
 
     // Initialize tf listener and buffer ros objects
     tfBuffer_ = std::make_unique<tf2_ros::Buffer>();
@@ -42,14 +41,15 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor("robot_description"));      
     
     // update the planning scene monitor with the current state
-    bool success = planning_scene_monitor_->requestPlanningSceneState("/get_planning_scene");
+    bool success = planning_scene_monitor_->requestPlanningSceneState("get_planning_scene");
     ROS_INFO_STREAM("Request planning scene " << (success ? "succeeded." : "failed."));
 
     // keep up to date with new changes
-    planning_scene_monitor_->startSceneMonitor("/move_group/monitored_planning_scene");
+    planning_scene_monitor_->startSceneMonitor("move_group/monitored_planning_scene");
     
     // Moveit Initialization 
     move_group_tf2_buffer_.reset(new tf2_ros::Buffer);
+    
 
     try
     {
@@ -66,8 +66,9 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     robot_base_link_ = move_group_->getPlanningFrame();
     robot_eef_link_ = move_group_->getEndEffectorLink();
 
+
     // Visualization publisher
-    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools(robot_base_link_,"/moveit_visual_markers"));
+    visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools(robot_base_link_,"moveit_visual_markers"));
 
     visual_tools_->deleteAllMarkers();
 
@@ -88,6 +89,9 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     }
 
     scene_storage_.reset(new moveit_warehouse::PlanningSceneStorage(conn_));
+
+    // Visualization timer
+    frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));
 }
 
 SceneManager::~SceneManager(){
@@ -96,7 +100,7 @@ SceneManager::~SceneManager(){
 
 void SceneManager::loadSceneYaml()
 { 
-
+  scene_objects_names_ = std::vector<std::string>();
   // Read and store parameter objects from parameter server
   pnh_.param<std::vector<std::string>>("objects", scene_objects_names_, scene_objects_names_);
   // Create class Object_Builder objects
@@ -541,7 +545,6 @@ void SceneManager::frameTimerCB()
   Eigen::Isometry3d object_transform;
   for (auto & [id, current_object] : current_objects)
   {
-
     object_transform= planning_scene->getFrameTransform(current_object.id);
     visual_tools_->publishAxisLabeled(planning_scene->getFrameTransform(current_object.id), id, rviz_visual_tools::LARGE);
   
