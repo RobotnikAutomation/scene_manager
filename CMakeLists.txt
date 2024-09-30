@@ -31,6 +31,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+      
 
 add_library(${PROJECT_NAME}
   src/scene_manager.cpp
@@ -56,4 +57,23 @@ install(
 install(
   DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+add_executable(scene_manager_node 
+              src/scene_manager_node.cpp 
+)
+
+
+target_link_libraries(scene_manager_node
+                      scene_manager
+                      ${catkin_LIBRARIES}
+)
+
+add_dependencies(scene_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+install(
+  TARGETS scene_manager_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
 )

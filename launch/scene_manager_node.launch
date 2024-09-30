@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="scene_manager_node" pkg="scene_manager" type="scene_manager_node" output="screen" clear_params="true">
+        <rosparam command="load" file="$(find scene_manager)/config/objects_config.yaml" />
+        <rosparam command="load" file="$(find scene_manager)/config/robot_config.yaml" />
+        <remap from="joint_states" to="/robot/joint_states" />
+    </node>
+</launch>

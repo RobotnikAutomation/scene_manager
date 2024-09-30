@@ -6,10 +6,11 @@ move_group_timeout: 500
 publish_tf: true
 
 #Robot setup
-end_effector_link: tool0
-robot_base_link: base_link
+end_effector_link: robot_arm_tool0
+robot_base_link: robot_base_footprint
 
 #Mongodb
+connect_db: false
 host: "localhost"
 port: 33829
 

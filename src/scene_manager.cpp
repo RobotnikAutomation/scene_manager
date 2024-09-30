@@ -13,7 +13,8 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     pnh_.param<std::string>("end_effector_link", robot_eef_link_, robot_eef_link_);
     pnh_.param<std::string>("group_name", group_name_, group_name_);
     pnh_.param<double>("move_group_timeout", move_group_timeout_, move_group_timeout_);
-    pnh_.param<bool>("publish_tf", publish_tf_, publish_tf_);    
+    pnh_.param<bool>("publish_tf", publish_tf_, publish_tf_); 
+    pnh_.param<bool>("connect_db", connect_db_, connect_db_);   
     pnh_.param<std::string>("host", host_, host_);
     pnh_.param<int>("port", port_, port_);
 
@@ -66,29 +67,34 @@ SceneManager::SceneManager(ros::NodeHandle nh, bool wait) : PlanningSceneInterfa
     robot_base_link_ = move_group_->getPlanningFrame();
     robot_eef_link_ = move_group_->getEndEffectorLink();
 
+    // Listen to joint states
+    move_group_->startStateMonitor();
 
     // Visualization publisher
     visual_tools_.reset(new moveit_visual_tools::MoveItVisualTools(robot_base_link_,"moveit_visual_markers"));
-
     visual_tools_->deleteAllMarkers();
 
     // Read and store scene description
     loadSceneYaml();
 
-    // Connect to moveit's warehouse mongo db database
-    conn_ = moveit_warehouse::loadDatabase();
-    conn_->setParams(host_, port_);
 
-    ROS_INFO("Connecting to warehouse on %s:%d", host_.c_str(), port_);
-
-    while (!conn_->connect())
+    if(connect_db_)
     {
-      ROS_ERROR("Failed to connect to DB on %s:%d ", host_.c_str(), port_);
-      ros::Duration(2).sleep();
+      // Connect to moveit's warehouse mongo db database
+      conn_ = moveit_warehouse::loadDatabase();
       conn_->setParams(host_, port_);
-    }
 
-    scene_storage_.reset(new moveit_warehouse::PlanningSceneStorage(conn_));
+      ROS_INFO("Connecting to warehouse on %s:%d", host_.c_str(), port_);
+
+      while (!conn_->connect())
+      {
+        ROS_ERROR("Failed to connect to DB on %s:%d ", host_.c_str(), port_);
+        ros::Duration(2).sleep();
+        conn_->setParams(host_, port_);
+      }
+
+      scene_storage_.reset(new moveit_warehouse::PlanningSceneStorage(conn_));
+    }
 
     // Visualization timer
     frame_publisher_timer_ = pnh_.createTimer(ros::Duration(1), std::bind(&SceneManager::frameTimerCB, this));

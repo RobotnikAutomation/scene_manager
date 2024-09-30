@@ -131,6 +131,7 @@ class SceneManager : public moveit::planning_interface::PlanningSceneInterface
 
     // MongoDB database
     warehouse_ros::DatabaseConnection::Ptr conn_;
+    bool connect_db_;
     std::string host_;
     int port_;
     std::unique_ptr<moveit_warehouse::PlanningSceneStorage> scene_storage_;

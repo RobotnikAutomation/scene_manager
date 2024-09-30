@@ -7,7 +7,7 @@ objects:
 crates:
   spawn: true
   static: false
-  frame_id: base_link # moveit frame id
+  frame_id: robot_base_footprint # moveit frame id
   geometry:
     box:
       height: 0.14
@@ -22,7 +22,7 @@ crates:
 table:
   spawn: true
   static: true
-  frame_id: base_link # moveit frame id
+  frame_id: robot_base_footprint # moveit frame id
   geometry:
     box:
       height: 0.60
@@ -33,7 +33,7 @@ table:
 pallet_stack:
   spawn: true
   static: true
-  frame_id: base_link # moveit frame id
+  frame_id: robot_base_footprint # moveit frame id
   geometry:
     box:
       height: 0.14
@@ -44,7 +44,7 @@ pallet_stack:
 pallet_destack:
   spawn: true
   static: true
-  frame_id: base_link # moveit frame id
+  frame_id: robot_base_footprint # moveit frame id
   geometry:
     box:
       height: 0.14
