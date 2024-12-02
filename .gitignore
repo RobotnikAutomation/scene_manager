@@ -1,0 +1,11 @@
+.vscode/
+*.png
+*.pcd
+*.ply
+*.pyc
+*.pswp*.png
+*.pcd
+*.ply
+*.pyc
+*.pswp
+!.gitignore
